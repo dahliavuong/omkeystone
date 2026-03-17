@@ -82,15 +82,16 @@ export function NotesImportPanel({
             Upload workshop notes (.txt, .docx) or paste unstructured text directly.
           </p>
         </div>
-        {importedNote ? (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onGenerateSuggestions}
-              className="rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white transition hover:bg-teal-700"
-            >
-              Generate OST suggestions
-            </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onGenerateSuggestions}
+            disabled={!importedNote}
+            className="rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:bg-teal-700/45"
+          >
+            Generate OST suggestions
+          </button>
+          {importedNote ? (
             <button
               type="button"
               onClick={onClearImportedNote}
@@ -98,9 +99,14 @@ export function NotesImportPanel({
             >
               Clear imported note
             </button>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
       </div>
+      <p className="mt-2 text-xs text-slate-500">
+        {importedNote
+          ? 'Ready to generate draft opportunities, solutions, and assumptions.'
+          : 'Import or paste notes first, then generate OST suggestions.'}
+      </p>
 
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
         <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
