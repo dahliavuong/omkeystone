@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { ImportedNote } from '../types/noteImport';
 import { importNoteFromFile, importNoteFromPastedText } from '../utils/noteImport';
+import { generateOSTSuggestionsFromImportedNote } from '../utils/ostSuggestion';
 
 type NotesImportPanelProps = {
   importedNote: ImportedNote | null;
@@ -19,57 +20,92 @@ const statusStyles: Record<Status['type'], string> = {
   error: 'border-rose-200 bg-rose-50 text-rose-700',
 };
 
-type BulletLine = {
-  depth: number;
-  text: string;
+const cleanLine = (text: string): string =>
+  text
+    .replace(/^draft:\s*/i, '')
+    .replace(/^we assume\s*/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const firstSentence = (content: string): string => {
+  const sentence =
+    content
+      .replace(/\r/g, ' ')
+      .split(/[.!?]\s+/)
+      .map((part) => part.trim())
+      .find((part) => part.length > 24) ?? 'Improve business outcomes from the imported notes';
+  return sentence.length > 120 ? `${sentence.slice(0, 117)}...` : sentence;
 };
 
-const normalizeBulletDepth = (depth: number): number => {
-  return Math.max(0, Math.min(depth, 3));
+const nextValue = (items: string[], cursor: { value: number }, fallback: string): string => {
+  const value = items[cursor.value];
+  cursor.value += 1;
+  return value ? cleanLine(value) : fallback;
 };
 
-const getDepthFromLinePrefix = (line: string, indentDepth: number): number => {
-  const numberedPrefix = line.match(/^(\d+(?:\.\d+)*)[.)]?\s+/);
-  if (numberedPrefix) {
-    const levels = numberedPrefix[1].split('.').length - 1;
-    return normalizeBulletDepth(levels);
+const buildStructuredPreview = (note: ImportedNote): string => {
+  const suggestions = generateOSTSuggestionsFromImportedNote(note);
+  const opportunityTitles = suggestions.opportunities.map((item) => item.title);
+  const solutionTitles = suggestions.solutions.map((item) => item.title);
+  const assumptionTitles = suggestions.assumptions.map((item) => item.title);
+
+  const oppCursor = { value: 0 };
+  const solCursor = { value: 0 };
+  const assCursor = { value: 0 };
+
+  const outcome = `Outcome: ${firstSentence(note.content)}`;
+  const lines: string[] = [outcome];
+
+  const oppSpaceNames = [
+    'Opps space 1: Customer journey and experience',
+    'Opps space 2: Business enablement and execution',
+  ];
+
+  for (let spaceIndex = 0; spaceIndex < 2; spaceIndex += 1) {
+    lines.push(`- ${oppSpaceNames[spaceIndex]}`);
+
+    for (let bigIndex = 0; bigIndex < 3; bigIndex += 1) {
+      const bigFallback =
+        spaceIndex === 0
+          ? `Improve journey stage ${bigIndex + 1}`
+          : `Enable operating capability ${bigIndex + 1}`;
+      const bigTitle = nextValue(opportunityTitles, oppCursor, bigFallback);
+      lines.push(`    - Big opp ${bigIndex + 1}: ${bigTitle}`);
+
+      const smallOppCount = bigIndex === 0 ? 2 : 1;
+      for (let smallIndex = 0; smallIndex < smallOppCount; smallIndex += 1) {
+        const smallTitle = nextValue(
+          opportunityTitles,
+          oppCursor,
+          `Specific customer/business problem ${smallIndex + 1}`,
+        );
+        lines.push(`        - Small opp ${smallIndex + 1}: ${smallTitle}`);
+
+        const solutionCount = smallIndex === 0 ? 2 : 1;
+        for (let solutionIndex = 0; solutionIndex < solutionCount; solutionIndex += 1) {
+          const solutionTitle = nextValue(
+            solutionTitles,
+            solCursor,
+            `Solution direction ${solutionIndex + 1}`,
+          );
+          lines.push(`            - Solution ${solutionIndex + 1}: ${solutionTitle}`);
+
+          const assumptionCount = solutionIndex === 0 ? 2 : 1;
+          for (let assumptionIndex = 0; assumptionIndex < assumptionCount; assumptionIndex += 1) {
+            const assumptionTitle = nextValue(
+              assumptionTitles,
+              assCursor,
+              `Assumption to validate ${assumptionIndex + 1}`,
+            );
+            lines.push(`                - Assumption ${assumptionIndex + 1}: ${assumptionTitle}`);
+          }
+        }
+      }
+    }
   }
-  return normalizeBulletDepth(indentDepth);
+
+  return lines.join('\n');
 };
-
-const parseNoteToBulletLines = (content: string): BulletLine[] => {
-  const normalizedContent = content.replace(/\r/g, '').trim();
-  if (!normalizedContent) {
-    return [];
-  }
-
-  const rawLines = normalizedContent.split('\n').filter((line) => line.trim().length > 0);
-  const sourceLines =
-    rawLines.length > 1
-      ? rawLines
-      : normalizedContent
-          .split(/(?<=[.!?])\s+/)
-          .map((line) => line.trim())
-          .filter(Boolean);
-
-  return sourceLines.slice(0, 80).map((rawLine) => {
-    const leadingSpaces = rawLine.match(/^\s*/)?.[0].length ?? 0;
-    const indentDepth = Math.floor(leadingSpaces / 2);
-    const depth = getDepthFromLinePrefix(rawLine.trimStart(), indentDepth);
-    const text = rawLine
-      .trim()
-      .replace(/^[-*•▪◦]\s+/, '')
-      .replace(/^\d+(?:\.\d+)*[.)]?\s+/, '')
-      .trim();
-
-    return {
-      depth,
-      text: text || '(empty line)',
-    };
-  });
-};
-
-const bulletByDepth = ['•', '◦', '▪', '–'];
 
 export function NotesImportPanel({
   importedNote,
@@ -89,11 +125,11 @@ export function NotesImportPanel({
     return new Date(importedNote.importedAt).toLocaleString();
   }, [importedNote]);
 
-  const previewBulletLines = useMemo(() => {
+  const structuredPreview = useMemo(() => {
     if (!importedNote) {
-      return [];
+      return '';
     }
-    return parseNoteToBulletLines(importedNote.content);
+    return buildStructuredPreview(importedNote);
   }, [importedNote]);
 
   const handleImportFile = async () => {
@@ -259,24 +295,9 @@ export function NotesImportPanel({
             <p className="mt-2 text-xs text-slate-600">File: {importedNote.fileName}</p>
           ) : null}
           <p className="mt-3 text-sm font-medium text-slate-800">Imported note preview</p>
-          <div className="mt-1 max-h-40 overflow-auto rounded-lg border border-slate-200 bg-white p-3 text-xs leading-relaxed text-slate-700">
-            {previewBulletLines.length === 0 ? (
-              <p>No preview content available.</p>
-            ) : (
-              <ul className="space-y-1.5">
-                {previewBulletLines.map((line, index) => (
-                  <li
-                    key={`${line.text}-${index}`}
-                    className="flex items-start gap-2"
-                    style={{ paddingLeft: `${line.depth * 14}px` }}
-                  >
-                    <span className="mt-[1px] text-slate-500">{bulletByDepth[line.depth]}</span>
-                    <span>{line.text}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          <pre className="mt-1 max-h-72 overflow-auto whitespace-pre rounded-lg border border-slate-200 bg-white p-3 text-xs leading-relaxed text-slate-700">
+            {structuredPreview || 'No preview content available.'}
+          </pre>
         </div>
       ) : null}
     </section>
