@@ -1,4 +1,8 @@
-import type { OSTAIReviewInput, OSTAIReviewResult } from '../types/aiReview';
+import type {
+  OSTAIReviewConfig,
+  OSTAIReviewInput,
+  OSTAIReviewResult,
+} from '../types/aiReview';
 
 const SYSTEM_PROMPT = `
 You are an experienced Business Analyst, Product Strategist, and Discovery Lead.
@@ -62,11 +66,16 @@ ${input.proposedOst}
 
 export const runOstAiReview = async (
   input: OSTAIReviewInput,
+  runtimeConfig?: OSTAIReviewConfig,
 ): Promise<OSTAIReviewResult> => {
-  const apiKey = import.meta.env.VITE_LLM_API_KEY as string | undefined;
-  const model = (import.meta.env.VITE_LLM_MODEL as string | undefined) ?? 'gpt-4o-mini';
+  const apiKey = runtimeConfig?.apiKey || (import.meta.env.VITE_LLM_API_KEY as string | undefined);
+  const model =
+    runtimeConfig?.model ||
+    (import.meta.env.VITE_LLM_MODEL as string | undefined) ||
+    'gpt-4o-mini';
   const apiUrl =
-    (import.meta.env.VITE_LLM_API_URL as string | undefined) ??
+    runtimeConfig?.apiUrl ||
+    (import.meta.env.VITE_LLM_API_URL as string | undefined) ||
     'https://api.openai.com/v1/chat/completions';
 
   if (!apiKey) {
@@ -74,7 +83,7 @@ export const runOstAiReview = async (
       ok: false,
       missingApiKey: true,
       message:
-        'AI API key is missing. Set VITE_LLM_API_KEY in your environment to run the in-app assistant.',
+        'AI API key is missing. Add it in AI connection settings or set VITE_LLM_API_KEY in your environment.',
     };
   }
 

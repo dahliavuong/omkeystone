@@ -3,6 +3,12 @@ export type OSTAIReviewInput = {
   proposedOst: string;
 };
 
+export type OSTAIReviewConfig = {
+  apiKey?: string;
+  model?: string;
+  apiUrl?: string;
+};
+
 export type OSTAIReviewResult =
   | {
       ok: true;

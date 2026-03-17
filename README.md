@@ -75,6 +75,7 @@ VITE_LLM_API_URL=https://api.openai.com/v1/chat/completions
 ```
 
 If `VITE_LLM_API_KEY` is missing, the app still works and lets you copy the full structured review prompt.
+You can also provide API key/model/API URL directly in the AI Assistant panel and save those settings locally in the browser.
 
 ## Run locally
 
