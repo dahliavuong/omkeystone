@@ -52,14 +52,14 @@ const CATEGORY_KEYWORDS: Record<SuggestionCategory, string[]> = {
 };
 
 const PREFIX_PATTERNS: Record<SuggestionCategory, RegExp> = {
-  opportunity: /^\s*(opportunity|problem|pain|issue|challenge)\s*[:\-]/i,
-  solution: /^\s*(solution|idea|initiative|action|proposal)\s*[:\-]/i,
-  assumption: /^\s*(assumption|hypothesis|belief|risk)\s*[:\-]/i,
+  opportunity: /^\s*(opportunity|problem|pain|issue|challenge)\s*[:-]/i,
+  solution: /^\s*(solution|idea|initiative|action|proposal)\s*[:-]/i,
+  assumption: /^\s*(assumption|hypothesis|belief|risk)\s*[:-]/i,
 };
 
 const normalizeLine = (line: string): string => {
   return line
-    .replace(/^[\-\*\u2022\d\.\)\s]+/, '')
+    .replace(/^[-*\u2022\d.)\s]+/, '')
     .replace(/\s+/g, ' ')
     .trim();
 };
