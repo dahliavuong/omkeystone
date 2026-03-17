@@ -1,10 +1,12 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
+import type { ImportedNote } from '../types/noteImport';
 import type { OSTData } from '../types/ost';
 import { buildConnections } from '../utils/connector';
 import { getMaxBigOpportunities, getNodeId } from '../utils/layout';
 import { ConnectorLayer } from './ConnectorLayer';
 import { LegendPanel } from './LegendPanel';
 import { LevelRow } from './LevelRow';
+import { NotesImportPanel } from './NotesImportPanel';
 import { OSTCard } from './OSTCard';
 import { TreeBranch } from './TreeBranch';
 
@@ -16,6 +18,7 @@ export function OSTBoard({ data }: OSTBoardProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const nodeElementsRef = useRef<Map<string, HTMLDivElement>>(new Map());
   const [nodeVersion, setNodeVersion] = useState(0);
+  const [importedNote, setImportedNote] = useState<ImportedNote | null>(null);
 
   const registerNode = useCallback((id: string, element: HTMLDivElement | null) => {
     const current = nodeElementsRef.current.get(id);
@@ -43,6 +46,13 @@ export function OSTBoard({ data }: OSTBoardProps) {
 
         <main className="flex-1 overflow-auto">
           <div className="relative min-h-screen min-w-max p-10">
+            <div className="mx-auto mb-6 w-full max-w-[1800px] min-w-[980px]">
+              <NotesImportPanel
+                importedNote={importedNote}
+                onImported={setImportedNote}
+                onClearImportedNote={() => setImportedNote(null)}
+              />
+            </div>
             <div
               ref={canvasRef}
               className="relative mx-auto flex min-w-max flex-col items-center gap-14 rounded-2xl border border-slate-200 bg-white p-10 shadow-sm"
