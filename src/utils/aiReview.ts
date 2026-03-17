@@ -208,11 +208,22 @@ E. Suggested Improved OST
 export const runOstAiReview = async (
   input: OSTAIReviewInput,
 ): Promise<OSTAIReviewResult> => {
-  const apiKey = import.meta.env.VITE_LLM_API_KEY as string | undefined;
-  const model = (import.meta.env.VITE_LLM_MODEL as string | undefined) || 'gpt-4o-mini';
-  const apiUrl =
-    (import.meta.env.VITE_LLM_API_URL as string | undefined) ||
-    'https://api.openai.com/v1/chat/completions';
+  const env = import.meta.env;
+  const apiKey =
+    (env.VITE_OST_LLM_API_KEY as string | undefined) ||
+    (env.VITE_LLM_API_KEY as string | undefined);
+  const model =
+    (env.VITE_OST_LLM_MODEL as string | undefined) ||
+    (env.VITE_LLM_MODEL as string | undefined) ||
+    'gpt-4o-mini';
+  const explicitApiUrl =
+    (env.VITE_OST_LLM_API_URL as string | undefined) ||
+    (env.VITE_LLM_API_URL as string | undefined);
+  const baseUrl =
+    (env.VITE_OST_LLM_BASE_URL as string | undefined) ||
+    (env.VITE_LLM_BASE_URL as string | undefined) ||
+    'https://api.openai.com/v1';
+  const apiUrl = explicitApiUrl ?? `${baseUrl.replace(/\/$/, '')}/chat/completions`;
 
   if (!apiKey) {
     return runOfflineReview(input);

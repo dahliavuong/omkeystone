@@ -68,13 +68,14 @@ The board now starts **blank by default**. You can populate it by applying gener
 Set environment variables before running dev/preview:
 
 ```bash
-VITE_LLM_API_KEY=your_api_key
+VITE_OST_LLM_API_KEY=your_api_key
 # Optional overrides
-VITE_LLM_MODEL=gpt-4o-mini
-VITE_LLM_API_URL=https://api.openai.com/v1/chat/completions
+VITE_OST_LLM_BASE_URL=https://api.openai.com/v1
+VITE_OST_LLM_MODEL=gpt-4o-mini
 ```
 
-If `VITE_LLM_API_KEY` is missing, the assistant automatically falls back to an in-app **offline advisory review mode** and still returns a structured critique.
+Compatibility fallbacks are also supported (`VITE_LLM_API_KEY`, `VITE_LLM_API_URL`, `VITE_LLM_MODEL`).
+If no API key is configured, the assistant automatically falls back to an in-app **offline advisory review mode** and still returns a structured critique.
 
 ## Run locally
 
