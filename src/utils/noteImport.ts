@@ -1,4 +1,3 @@
-import mammoth from 'mammoth/mammoth.browser';
 import type { ImportedNote, NoteImportResult } from '../types/noteImport';
 
 const MIN_READABLE_CHARACTERS = 12;
@@ -59,6 +58,8 @@ const parseTextFile = async (file: File): Promise<string> => {
 
 const parseDocxFile = async (file: File): Promise<string> => {
   const arrayBuffer = await file.arrayBuffer();
+  const mammothModule = await import('mammoth/mammoth.browser');
+  const mammoth = mammothModule.default;
   const result = await mammoth.extractRawText({ arrayBuffer });
   return result.value;
 };
