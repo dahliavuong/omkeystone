@@ -95,10 +95,7 @@ export function OSTSuggestionsPanel({ suggestions, onApplySelected }: OSTSuggest
 
   const isSelected = (id: string): boolean => selectionOverrides[id] ?? true;
 
-  const selectedCards = useMemo(
-    () => allCards.filter((item) => isSelected(item.id)),
-    [allCards, selectionOverrides],
-  );
+  const selectedCards = allCards.filter((item) => isSelected(item.id));
 
   const toggleSelection = (id: string) => {
     setSelectionOverrides((current) => ({
