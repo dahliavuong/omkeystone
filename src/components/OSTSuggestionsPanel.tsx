@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { DraftSuggestionCard } from '../types/ostSuggestion';
 import type { GeneratedOSTSuggestions, SuggestionConfidence } from '../types/ostSuggestion';
 
@@ -18,7 +18,7 @@ type SectionProps = {
   subtitle: string;
   cardClassName: string;
   items: GeneratedOSTSuggestions['opportunities'];
-  selectedIds: Set<string>;
+  isSelected: (id: string) => boolean;
   onToggle: (id: string) => void;
 };
 
@@ -27,7 +27,7 @@ function SuggestionSection({
   subtitle,
   cardClassName,
   items,
-  selectedIds,
+  isSelected,
   onToggle,
 }: SectionProps) {
   return (
@@ -45,14 +45,14 @@ function SuggestionSection({
             <article
               key={item.id}
               className={`rounded-lg border p-3 ${cardClassName} ${
-                selectedIds.has(item.id) ? 'ring-1 ring-slate-400' : ''
+                isSelected(item.id) ? 'ring-1 ring-slate-400' : ''
               }`}
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-start gap-2">
                   <input
                     type="checkbox"
-                    checked={selectedIds.has(item.id)}
+                    checked={isSelected(item.id)}
                     onChange={() => onToggle(item.id)}
                     className="mt-0.5 h-3.5 w-3.5 rounded border-slate-300"
                     aria-label={`Select suggestion: ${item.title}`}
@@ -91,39 +91,36 @@ export function OSTSuggestionsPanel({ suggestions, onApplySelected }: OSTSuggest
     return [...suggestions.opportunities, ...suggestions.solutions, ...suggestions.assumptions];
   }, [suggestions]);
 
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectionOverrides, setSelectionOverrides] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    if (!suggestions) {
-      setSelectedIds(new Set());
-      return;
-    }
-    setSelectedIds(new Set(allCards.map((item) => item.id)));
-  }, [allCards, suggestions]);
+  const isSelected = (id: string): boolean => selectionOverrides[id] ?? true;
 
   const selectedCards = useMemo(
-    () => allCards.filter((item) => selectedIds.has(item.id)),
-    [allCards, selectedIds],
+    () => allCards.filter((item) => isSelected(item.id)),
+    [allCards, selectionOverrides],
   );
 
   const toggleSelection = (id: string) => {
-    setSelectedIds((current) => {
-      const next = new Set(current);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
+    setSelectionOverrides((current) => ({
+      ...current,
+      [id]: !isSelected(id),
+    }));
   };
 
   const handleSelectAll = () => {
-    setSelectedIds(new Set(allCards.map((item) => item.id)));
+    const nextOverrides = allCards.reduce<Record<string, boolean>>((acc, item) => {
+      acc[item.id] = true;
+      return acc;
+    }, {});
+    setSelectionOverrides(nextOverrides);
   };
 
   const handleClearSelection = () => {
-    setSelectedIds(new Set());
+    const nextOverrides = allCards.reduce<Record<string, boolean>>((acc, item) => {
+      acc[item.id] = false;
+      return acc;
+    }, {});
+    setSelectionOverrides(nextOverrides);
   };
 
   if (!suggestions) {
@@ -198,7 +195,7 @@ export function OSTSuggestionsPanel({ suggestions, onApplySelected }: OSTSuggest
           subtitle="Auto-detected customer/business problems and opportunity statements."
           cardClassName="border-slate-200 bg-white"
           items={suggestions.opportunities}
-          selectedIds={selectedIds}
+          isSelected={isSelected}
           onToggle={toggleSelection}
         />
         <SuggestionSection
@@ -206,7 +203,7 @@ export function OSTSuggestionsPanel({ suggestions, onApplySelected }: OSTSuggest
           subtitle="Potential solution concepts inferred from action-oriented notes."
           cardClassName="border-[#D7CEFF] bg-[#EEEAFE]"
           items={suggestions.solutions}
-          selectedIds={selectedIds}
+          isSelected={isSelected}
           onToggle={toggleSelection}
         />
         <SuggestionSection
@@ -214,7 +211,7 @@ export function OSTSuggestionsPanel({ suggestions, onApplySelected }: OSTSuggest
           subtitle="Beliefs and hypotheses requiring validation."
           cardClassName="border-[#F4CADC] bg-[#FDECF3]"
           items={suggestions.assumptions}
-          selectedIds={selectedIds}
+          isSelected={isSelected}
           onToggle={toggleSelection}
         />
       </div>
