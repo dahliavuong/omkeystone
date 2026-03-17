@@ -3,20 +3,14 @@ export type OSTAIReviewInput = {
   proposedOst: string;
 };
 
-export type OSTAIReviewConfig = {
-  apiKey?: string;
-  model?: string;
-  apiUrl?: string;
-};
-
 export type OSTAIReviewResult =
   | {
       ok: true;
       report: string;
       model: string;
+      mode: 'llm' | 'offline';
     }
   | {
       ok: false;
       message: string;
-      missingApiKey?: boolean;
     };

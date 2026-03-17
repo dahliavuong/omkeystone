@@ -24,28 +24,10 @@ const buildInput = (projectContext: string, proposedOst: string): OSTAIReviewInp
   proposedOst: proposedOst.trim(),
 });
 
-const API_KEY_STORAGE_KEY = 'ost_ai_api_key';
-
-const readStoredApiKey = (): string => {
-  if (typeof window === 'undefined') {
-    return '';
-  }
-  return window.localStorage.getItem(API_KEY_STORAGE_KEY) ?? '';
-};
-
 export function OSTAIAssistantPanel({ ostData }: OSTAIAssistantPanelProps) {
   const currentOstSnapshot = useMemo(() => serializeOstForReview(ostData), [ostData]);
   const [projectContext, setProjectContext] = useState('');
   const [proposedOst, setProposedOst] = useState(currentOstSnapshot);
-  const [apiKey, setApiKey] = useState<string>(() => readStoredApiKey());
-  const [model, setModel] = useState<string>(
-    () => (import.meta.env.VITE_LLM_MODEL as string | undefined) ?? 'gpt-4o-mini',
-  );
-  const [apiUrl, setApiUrl] = useState<string>(
-    () =>
-      (import.meta.env.VITE_LLM_API_URL as string | undefined) ??
-      'https://api.openai.com/v1/chat/completions',
-  );
   const [reviewOutput, setReviewOutput] = useState('');
   const [status, setStatus] = useState<Status | null>(null);
   const [isRunning, setIsRunning] = useState(false);
@@ -77,16 +59,12 @@ export function OSTAIAssistantPanel({ ostData }: OSTAIAssistantPanelProps) {
       message: 'Running AI resonance review...',
     });
 
-    const result = await runOstAiReview(buildInput(projectContext, proposedOst), {
-      apiKey: apiKey.trim() || undefined,
-      model: model.trim() || undefined,
-      apiUrl: apiUrl.trim() || undefined,
-    });
+    const result = await runOstAiReview(buildInput(projectContext, proposedOst));
     setIsRunning(false);
 
     if (!result.ok) {
       setStatus({
-        type: result.missingApiKey ? 'info' : 'error',
+        type: 'error',
         message: result.message,
       });
       return;
@@ -94,22 +72,11 @@ export function OSTAIAssistantPanel({ ostData }: OSTAIAssistantPanelProps) {
 
     setReviewOutput(result.report);
     setStatus({
-      type: 'success',
-      message: `AI review generated successfully using model: ${result.model}`,
-    });
-  };
-
-  const handleSaveApiSettings = () => {
-    if (typeof window !== 'undefined') {
-      if (apiKey.trim()) {
-        window.localStorage.setItem(API_KEY_STORAGE_KEY, apiKey.trim());
-      } else {
-        window.localStorage.removeItem(API_KEY_STORAGE_KEY);
-      }
-    }
-    setStatus({
-      type: 'info',
-      message: 'AI connection settings saved locally in this browser session.',
+      type: result.mode === 'offline' ? 'info' : 'success',
+      message:
+        result.mode === 'offline'
+          ? 'Generated review in offline advisory mode (no API key required).'
+          : `AI review generated successfully using model: ${result.model}`,
     });
   };
 
@@ -152,54 +119,6 @@ export function OSTAIAssistantPanel({ ostData }: OSTAIAssistantPanelProps) {
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-2">
-        <div className="xl:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-semibold text-slate-900">AI connection settings</p>
-            <button
-              type="button"
-              onClick={handleSaveApiSettings}
-              className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
-            >
-              Save settings locally
-            </button>
-          </div>
-          <p className="mt-1 text-xs text-slate-600">
-            Enter your API key here to run the in-app assistant without env configuration.
-          </p>
-          <div className="mt-3 grid gap-3 md:grid-cols-3">
-            <label className="text-xs text-slate-600">
-              API key
-              <input
-                type="password"
-                value={apiKey}
-                onChange={(event) => setApiKey(event.target.value)}
-                placeholder="sk-..."
-                className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
-              />
-            </label>
-            <label className="text-xs text-slate-600">
-              Model
-              <input
-                type="text"
-                value={model}
-                onChange={(event) => setModel(event.target.value)}
-                placeholder="gpt-4o-mini"
-                className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
-              />
-            </label>
-            <label className="text-xs text-slate-600">
-              API URL
-              <input
-                type="text"
-                value={apiUrl}
-                onChange={(event) => setApiUrl(event.target.value)}
-                placeholder="https://api.openai.com/v1/chat/completions"
-                className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
-              />
-            </label>
-          </div>
-        </div>
-
         <div>
           <label className="text-sm font-semibold text-slate-900" htmlFor="project-context">
             Project context
