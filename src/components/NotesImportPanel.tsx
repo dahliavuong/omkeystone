@@ -110,6 +110,29 @@ export function NotesImportPanel({
 
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
         <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+          <p className="text-sm font-semibold text-slate-900">Paste raw notes</p>
+          <p className="mt-1 text-xs text-slate-600">
+            Paste transcripts, workshop dumps, or brainstorm notes.
+          </p>
+
+          <textarea
+            value={pastedText}
+            onChange={(event) => setPastedText(event.target.value)}
+            rows={7}
+            placeholder="Paste raw workshop notes here..."
+            className="mt-4 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-inner outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+          />
+
+          <button
+            type="button"
+            onClick={handleImportPastedText}
+            className="mt-4 rounded-lg bg-[#4338CA] px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
+          >
+            Import pasted notes
+          </button>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
           <p className="text-sm font-semibold text-slate-900">Import from file</p>
           <p className="mt-1 text-xs text-slate-600">Supported formats: .txt, .docx</p>
 
@@ -135,27 +158,6 @@ export function NotesImportPanel({
             className="mt-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isImportingFile ? 'Importing file...' : 'Import file'}
-          </button>
-        </div>
-
-        <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-          <p className="text-sm font-semibold text-slate-900">Paste raw notes</p>
-          <p className="mt-1 text-xs text-slate-600">Paste transcripts, workshop dumps, or brainstorm notes.</p>
-
-          <textarea
-            value={pastedText}
-            onChange={(event) => setPastedText(event.target.value)}
-            rows={7}
-            placeholder="Paste raw workshop notes here..."
-            className="mt-4 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-inner outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-          />
-
-          <button
-            type="button"
-            onClick={handleImportPastedText}
-            className="mt-4 rounded-lg bg-[#4338CA] px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
-          >
-            Import pasted notes
           </button>
         </div>
       </div>

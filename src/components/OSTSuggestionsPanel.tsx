@@ -1,10 +1,15 @@
 import { useMemo, useState } from 'react';
+import type { OSTData } from '../types/ost';
 import type { DraftSuggestionCard } from '../types/ostSuggestion';
 import type { GeneratedOSTSuggestions, SuggestionConfidence } from '../types/ostSuggestion';
+import { buildOstReviewPrompt, runOstAiReview } from '../utils/aiReview';
+import { serializeOstForReview } from '../utils/ostSerialize';
 
 type OSTSuggestionsPanelProps = {
   suggestions: GeneratedOSTSuggestions | null;
   onApplySelected: (selectedCards: DraftSuggestionCard[]) => void;
+  ostData: OSTData;
+  projectContext: string;
 };
 
 const confidenceStyles: Record<SuggestionConfidence, string> = {
@@ -76,7 +81,18 @@ function SuggestionSection({
   );
 }
 
-export function OSTSuggestionsPanel({ suggestions, onApplySelected }: OSTSuggestionsPanelProps) {
+export function OSTSuggestionsPanel({
+  suggestions,
+  onApplySelected,
+  ostData,
+  projectContext,
+}: OSTSuggestionsPanelProps) {
+  const statusClasses = {
+    success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    error: 'border-rose-200 bg-rose-50 text-rose-700',
+    info: 'border-slate-200 bg-slate-50 text-slate-700',
+  } as const;
+
   const generatedAtText = useMemo(() => {
     if (!suggestions) {
       return '';
@@ -92,10 +108,20 @@ export function OSTSuggestionsPanel({ suggestions, onApplySelected }: OSTSuggest
   }, [suggestions]);
 
   const [selectionOverrides, setSelectionOverrides] = useState<Record<string, boolean>>({});
+  const [aiStatus, setAiStatus] = useState<{
+    type: keyof typeof statusClasses;
+    message: string;
+  } | null>(null);
+  const [aiOutput, setAiOutput] = useState('');
+  const [isAiRunning, setIsAiRunning] = useState(false);
 
   const isSelected = (id: string): boolean => selectionOverrides[id] ?? true;
 
   const selectedCards = allCards.filter((item) => isSelected(item.id));
+  const proposedOst = useMemo(() => serializeOstForReview(ostData), [ostData]);
+  const normalizedContext =
+    projectContext.trim() ||
+    'No explicit project context provided. Evaluate based on the current OST and available note-derived signals.';
 
   const toggleSelection = (id: string) => {
     setSelectionOverrides((current) => ({
@@ -120,6 +146,49 @@ export function OSTSuggestionsPanel({ suggestions, onApplySelected }: OSTSuggest
     setSelectionOverrides(nextOverrides);
   };
 
+  const handleCopyAiPrompt = async () => {
+    const prompt = buildOstReviewPrompt({
+      projectContext: normalizedContext,
+      proposedOst,
+    });
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setAiStatus({
+        type: 'info',
+        message: 'AI review prompt copied to clipboard.',
+      });
+    } catch {
+      setAiStatus({
+        type: 'error',
+        message: 'Unable to copy prompt from this browser session.',
+      });
+    }
+  };
+
+  const handleRunAiReview = async () => {
+    setIsAiRunning(true);
+    setAiStatus({ type: 'info', message: 'Running AI resonance review...' });
+    const result = await runOstAiReview({
+      projectContext: normalizedContext,
+      proposedOst,
+    });
+    setIsAiRunning(false);
+
+    if (!result.ok) {
+      setAiStatus({ type: 'error', message: result.message });
+      return;
+    }
+
+    setAiOutput(result.report);
+    setAiStatus({
+      type: result.mode === 'offline' ? 'info' : 'success',
+      message:
+        result.mode === 'offline'
+          ? 'Generated review in offline advisory mode.'
+          : `AI review generated successfully using model: ${result.model}`,
+    });
+  };
+
   if (!suggestions) {
     return (
       <section className="rounded-2xl border border-dashed border-slate-300 bg-white p-6">
@@ -127,6 +196,9 @@ export function OSTSuggestionsPanel({ suggestions, onApplySelected }: OSTSuggest
         <p className="mt-1 text-sm text-slate-600">
           Import notes, then run suggestion generation to auto-detect draft opportunities,
           solutions, and assumptions.
+        </p>
+        <p className="mt-2 text-xs text-slate-500">
+          AI resonance review will appear here after suggestions are generated.
         </p>
       </section>
     );
@@ -211,6 +283,49 @@ export function OSTSuggestionsPanel({ suggestions, onApplySelected }: OSTSuggest
           isSelected={isSelected}
           onToggle={toggleSelection}
         />
+      </div>
+
+      <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">
+              AI Assistant: Resonance review
+            </p>
+            <p className="mt-1 text-xs text-slate-600">
+              Embedded review of OST relevance and strategic fit based on imported notes and current
+              tree.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleCopyAiPrompt}
+              className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
+            >
+              Copy prompt
+            </button>
+            <button
+              type="button"
+              onClick={handleRunAiReview}
+              disabled={isAiRunning}
+              className="rounded-md bg-[#0F766E] px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:bg-teal-400"
+            >
+              {isAiRunning ? 'Running review...' : 'Run AI review'}
+            </button>
+          </div>
+        </div>
+
+        {aiStatus ? (
+          <div
+            className={`mt-3 rounded-lg border px-3 py-2 text-xs ${statusClasses[aiStatus.type]}`}
+          >
+            {aiStatus.message}
+          </div>
+        ) : null}
+
+        <pre className="mt-3 max-h-[420px] overflow-auto whitespace-pre-wrap rounded-lg border border-slate-200 bg-white p-3 text-xs leading-relaxed text-slate-700">
+          {aiOutput || 'No AI review generated yet.'}
+        </pre>
       </div>
     </section>
   );

@@ -7,10 +7,8 @@ import { getMaxBigOpportunities, getNodeId } from '../utils/layout';
 import { applySelectedSuggestionsToOST, createBlankOSTData } from '../utils/ostDraft';
 import { generateOSTSuggestionsFromImportedNote } from '../utils/ostSuggestion';
 import { ConnectorLayer } from './ConnectorLayer';
-import { LegendPanel } from './LegendPanel';
 import { LevelRow } from './LevelRow';
 import { NotesImportPanel } from './NotesImportPanel';
-import { OSTAIAssistantPanel } from './OSTAIAssistantPanel';
 import { OSTCard } from './OSTCard';
 import { OSTSuggestionsPanel } from './OSTSuggestionsPanel';
 import { TreeBranch } from './TreeBranch';
@@ -82,82 +80,77 @@ export function OSTBoard({ initialData }: OSTBoardProps) {
 
   return (
     <div className="min-h-screen bg-[#F6F8FB] text-slate-800">
-      <div className="flex">
-        <LegendPanel />
-
-        <main className="flex-1 overflow-auto">
-          <div className="relative min-h-screen min-w-max p-10">
-            <div className="mx-auto mb-6 w-full max-w-[1800px] min-w-[980px]">
-              <NotesImportPanel
-                importedNote={importedNote}
-                onImported={handleImportedNote}
-                onClearImportedNote={handleClearImportedNote}
-                onGenerateSuggestions={handleGenerateSuggestions}
-              />
+      <main className="overflow-auto">
+        <div className="relative min-h-screen min-w-max p-10">
+          <div className="mx-auto mb-6 w-full max-w-[1800px] min-w-[980px]">
+            <NotesImportPanel
+              importedNote={importedNote}
+              onImported={handleImportedNote}
+              onClearImportedNote={handleClearImportedNote}
+              onGenerateSuggestions={handleGenerateSuggestions}
+            />
+          </div>
+          <div className="mx-auto mb-6 w-full max-w-[1800px] min-w-[980px]">
+            <OSTSuggestionsPanel
+              suggestions={suggestions}
+              onApplySelected={handleApplySelectedSuggestions}
+              ostData={ostData}
+              projectContext={importedNote?.content ?? ''}
+            />
+          </div>
+          {applyStatus ? (
+            <div className="mx-auto mb-6 w-full max-w-[1800px] min-w-[980px] rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+              {applyStatus}
             </div>
-            <div className="mx-auto mb-6 w-full max-w-[1800px] min-w-[980px]">
-              <OSTSuggestionsPanel
-                suggestions={suggestions}
-                onApplySelected={handleApplySelectedSuggestions}
-              />
-            </div>
-            <div className="mx-auto mb-6 w-full max-w-[1800px] min-w-[980px]">
-              <OSTAIAssistantPanel ostData={ostData} />
-            </div>
-            {applyStatus ? (
-              <div className="mx-auto mb-6 w-full max-w-[1800px] min-w-[980px] rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-                {applyStatus}
-              </div>
-            ) : null}
-            <div
-              ref={canvasRef}
-              className="relative mx-auto flex min-w-max flex-col items-center gap-14 rounded-2xl border border-slate-200 bg-white p-10 shadow-sm"
-            >
-              <ConnectorLayer
-                canvasRef={canvasRef}
-                nodeElementsRef={nodeElementsRef}
-                connections={connections}
-                version={nodeVersion}
-              />
+          ) : null}
+          <div
+            ref={canvasRef}
+            className="relative mx-auto flex min-w-max flex-col items-center gap-14 rounded-2xl border border-slate-200 bg-white p-10 shadow-sm"
+          >
+            <ConnectorLayer
+              canvasRef={canvasRef}
+              nodeElementsRef={nodeElementsRef}
+              connections={connections}
+              version={nodeVersion}
+            />
 
-              <div className="relative z-10 flex w-full flex-col items-center gap-12">
-                <LevelRow title="Outcome">
-                  <div className="flex justify-center">
-                    <OSTCard
-                      title={ostData.outcome || 'Outcome not set yet'}
-                      subtitle={
-                        ostData.outcome
-                          ? undefined
-                          : 'Apply selected suggestions to start building the tree'
-                      }
-                      variant="outcome"
-                      className="w-[560px] py-4 text-center text-base"
-                      nodeId={getNodeId.outcome()}
-                      registerNode={registerNode}
-                    />
-                  </div>
-                </LevelRow>
+            <div className="relative z-10 flex w-full flex-col items-center gap-12">
+              <LevelRow title="Outcome">
+                <div className="flex justify-center">
+                  <OSTCard
+                    title={ostData.outcome || 'Outcome not set yet'}
+                    subtitle={
+                      ostData.outcome
+                        ? undefined
+                        : 'Apply selected suggestions to start building the tree'
+                    }
+                    variant="outcome"
+                    className="w-[560px] py-4 text-center text-base"
+                    nodeId={getNodeId.outcome()}
+                    registerNode={registerNode}
+                  />
+                </div>
+              </LevelRow>
 
-                <LevelRow title="Opportunity Spaces">
-                  <div className="flex items-start justify-center gap-12">
-                    {ostData.opportunitySpaces.length === 0 ? (
-                      <div className="w-[620px] rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-8 text-center text-sm text-slate-500">
-                        The OST is blank. Generate suggestions from imported notes, then apply
-                        selected cards to create your first branch.
-                      </div>
-                    ) : null}
-                    {ostData.opportunitySpaces.map((space) => (
-                      <div key={space.id} style={{ width: `${branchWidth}px` }}>
-                        <TreeBranch opportunitySpace={space} registerNode={registerNode} />
-                      </div>
-                    ))}
-                  </div>
-                </LevelRow>
-              </div>
+              <LevelRow title="Opportunity Spaces">
+                <div className="flex items-start justify-center gap-12">
+                  {ostData.opportunitySpaces.length === 0 ? (
+                    <div className="w-[620px] rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-8 text-center text-sm text-slate-500">
+                      The OST is blank. Generate suggestions from imported notes, then apply
+                      selected cards to create your first branch.
+                    </div>
+                  ) : null}
+                  {ostData.opportunitySpaces.map((space) => (
+                    <div key={space.id} style={{ width: `${branchWidth}px` }}>
+                      <TreeBranch opportunitySpace={space} registerNode={registerNode} />
+                    </div>
+                  ))}
+                </div>
+              </LevelRow>
             </div>
           </div>
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
   );
 }
