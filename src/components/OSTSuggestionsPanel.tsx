@@ -1,14 +1,21 @@
 import { useMemo, useState } from 'react';
+import type { OSTData } from '../types/ost';
 import type { DraftSuggestionCard } from '../types/ostSuggestion';
 import type { GeneratedOSTSuggestions, SuggestionConfidence } from '../types/ostSuggestion';
 import {
   reviewDraftSuggestionLine,
   type SuggestionLineReview,
 } from '../utils/suggestionReview';
+import {
+  buildFullStructureReview,
+  type StructureLineReview,
+} from '../utils/structureReview';
+import type { ApplyStructureSeeds } from '../utils/ostDraft';
 
 type OSTSuggestionsPanelProps = {
   suggestions: GeneratedOSTSuggestions | null;
-  onApplySelected: (selectedCards: DraftSuggestionCard[]) => void;
+  onApplySelected: (selectedCards: DraftSuggestionCard[], seeds?: ApplyStructureSeeds) => void;
+  ostData: OSTData;
   projectContext: string;
 };
 
@@ -109,9 +116,45 @@ function SuggestionSection({
   );
 }
 
+type StructureSectionProps = {
+  title: string;
+  lines: StructureLineReview[];
+};
+
+function StructureSection({ title, lines }: StructureSectionProps) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+      <p className="text-sm font-semibold text-slate-900">{title}</p>
+      <div className="mt-3 space-y-2">
+        {lines.map((line, index) => (
+          <article key={`${title}-${index}`} className="rounded-lg border border-slate-200 bg-white p-3">
+            <p className="text-xs text-slate-600">
+              <span className="font-semibold text-slate-800">Original:</span> {line.original}
+            </p>
+            <div className="mt-2 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                Improved line
+              </p>
+              <p className="mt-1 text-xs font-medium text-emerald-800">{line.improved}</p>
+            </div>
+            <p className="mt-2 text-xs text-slate-700">
+              <span className="font-semibold text-slate-800">Comment:</span> {line.comment}
+            </p>
+            <p className="mt-1 text-xs text-slate-700">
+              <span className="font-semibold text-slate-800">Recommendation:</span>{' '}
+              {line.recommendation}
+            </p>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function OSTSuggestionsPanel({
   suggestions,
   onApplySelected,
+  ostData,
   projectContext,
 }: OSTSuggestionsPanelProps) {
   const generatedAtText = useMemo(() => {
@@ -142,6 +185,12 @@ export function OSTSuggestionsPanel({
       return acc;
     }, {});
   }, [allCards, normalizedContext]);
+  const structureReview = useMemo(() => {
+    if (!suggestions) {
+      return null;
+    }
+    return buildFullStructureReview(ostData, suggestions, normalizedContext);
+  }, [normalizedContext, ostData, suggestions]);
 
   const toggleSelection = (id: string) => {
     setSelectionOverrides((current) => ({
@@ -226,21 +275,20 @@ export function OSTSuggestionsPanel({
           </button>
           <button
             type="button"
-            onClick={() =>
-              onApplySelected(
-                selectedCards.map((card) => {
-                  const review = lineReviews[card.id];
-                  if (!review) {
-                    return card;
-                  }
-                  return {
-                    ...card,
-                    title: review.improvedLine,
-                    evidence: review.recommendedQuote ?? card.evidence,
-                  };
-                }),
-              )
-            }
+            onClick={() => {
+              const reviewedCards = selectedCards.map((card) => {
+                const review = lineReviews[card.id];
+                if (!review) {
+                  return card;
+                }
+                return {
+                  ...card,
+                  title: review.improvedLine,
+                  evidence: review.recommendedQuote ?? card.evidence,
+                };
+              });
+              onApplySelected(reviewedCards, structureReview?.applySeeds);
+            }}
             disabled={selectedCards.length === 0}
             className="rounded-md bg-[#1D4ED8] px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
           >
@@ -278,6 +326,36 @@ export function OSTSuggestionsPanel({
           lineReviews={lineReviews}
         />
       </div>
+
+      {structureReview ? (
+        <div className="mt-6 space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm font-semibold text-slate-900">
+              Complete OST structure check (all required parts)
+            </p>
+            <p className="mt-1 text-xs text-slate-600">
+              Includes Outcome, Opportunity Spaces, Big Opportunities, Smaller Opportunities /
+              Problems (with plain italic quote), Solutions, and Assumptions. Blank levels are
+              auto-filled with recommended ideas based on note context.
+            </p>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <StructureSection title="Outcome" lines={structureReview.outcome} />
+            <StructureSection
+              title="Opportunity Spaces"
+              lines={structureReview.opportunitySpaces}
+            />
+            <StructureSection title="Big Opportunities" lines={structureReview.bigOpportunities} />
+            <StructureSection
+              title="Smaller Opportunities / Problems"
+              lines={structureReview.smallerOpportunities}
+            />
+            <StructureSection title="Solutions" lines={structureReview.solutions} />
+            <StructureSection title="Assumptions" lines={structureReview.assumptions} />
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

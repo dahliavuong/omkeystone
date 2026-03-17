@@ -4,7 +4,11 @@ import type { DraftSuggestionCard, GeneratedOSTSuggestions } from '../types/ostS
 import type { OSTData } from '../types/ost';
 import { buildConnections } from '../utils/connector';
 import { getMaxBigOpportunities, getNodeId } from '../utils/layout';
-import { applySelectedSuggestionsToOST, createBlankOSTData } from '../utils/ostDraft';
+import {
+  applySelectedSuggestionsToOST,
+  createBlankOSTData,
+  type ApplyStructureSeeds,
+} from '../utils/ostDraft';
 import { generateOSTSuggestionsFromImportedNote } from '../utils/ostSuggestion';
 import { ConnectorLayer } from './ConnectorLayer';
 import { LevelRow } from './LevelRow';
@@ -68,13 +72,16 @@ export function OSTBoard({ initialData }: OSTBoardProps) {
     setApplyStatus(null);
   };
 
-  const handleApplySelectedSuggestions = (selectedCards: DraftSuggestionCard[]) => {
+  const handleApplySelectedSuggestions = (
+    selectedCards: DraftSuggestionCard[],
+    seeds?: ApplyStructureSeeds,
+  ) => {
     if (selectedCards.length === 0) {
       setApplyStatus('Select at least one suggestion card to apply.');
       return;
     }
 
-    setOstData((current) => applySelectedSuggestionsToOST(current, selectedCards));
+    setOstData((current) => applySelectedSuggestionsToOST(current, selectedCards, seeds));
     setApplyStatus(`Applied ${selectedCards.length} selected suggestion(s) to the OST.`);
   };
 
@@ -94,6 +101,7 @@ export function OSTBoard({ initialData }: OSTBoardProps) {
             <OSTSuggestionsPanel
               suggestions={suggestions}
               onApplySelected={handleApplySelectedSuggestions}
+              ostData={ostData}
               projectContext={importedNote?.content ?? ''}
             />
           </div>

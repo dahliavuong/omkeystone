@@ -20,11 +20,17 @@ export const createBlankOSTData = (): OSTData => ({
   opportunitySpaces: [],
 });
 
-const ensureBaseBranch = (draft: OSTData) => {
+export type ApplyStructureSeeds = {
+  outcome?: string;
+  opportunitySpaceTitle?: string;
+  bigOpportunityTitle?: string;
+};
+
+const ensureBaseBranch = (draft: OSTData, seeds?: ApplyStructureSeeds) => {
   if (draft.opportunitySpaces.length === 0) {
     draft.opportunitySpaces.push({
       id: createId('space', 'imported-notes-space'),
-      title: 'Imported Notes Space',
+      title: seeds?.opportunitySpaceTitle?.trim() || 'Imported Notes Space',
       bigOpportunities: [],
     });
   }
@@ -34,7 +40,7 @@ const ensureBaseBranch = (draft: OSTData) => {
   if (targetSpace.bigOpportunities.length === 0) {
     targetSpace.bigOpportunities.push({
       id: createId('big', 'generated-opportunities'),
-      title: 'Generated opportunities',
+      title: seeds?.bigOpportunityTitle?.trim() || 'Generated opportunities',
       smallerOpportunities: [],
     });
   }
@@ -87,6 +93,7 @@ const ensureAttachmentSolution = (opportunity: SmallerOpportunity): Solution => 
 export const applySelectedSuggestionsToOST = (
   current: OSTData,
   selectedCards: DraftSuggestionCard[],
+  seeds?: ApplyStructureSeeds,
 ): OSTData => {
   if (selectedCards.length === 0) {
     return current;
@@ -94,10 +101,10 @@ export const applySelectedSuggestionsToOST = (
 
   const next = structuredClone(current);
   if (!next.outcome.trim()) {
-    next.outcome = 'Draft outcome from imported notes';
+    next.outcome = seeds?.outcome?.trim() || 'Draft outcome from imported notes';
   }
 
-  const targetBigOpportunity = ensureBaseBranch(next);
+  const targetBigOpportunity = ensureBaseBranch(next, seeds);
   const selectedOpportunities = selectedCards.filter((card) => card.category === 'opportunity');
   const selectedSolutions = selectedCards.filter((card) => card.category === 'solution');
   const selectedAssumptions = selectedCards.filter((card) => card.category === 'assumption');

@@ -56,6 +56,7 @@ The board now starts **blank by default**. You can populate it by applying gener
 - It automatically reviews generated suggestions line-by-line and proposes improved lines under each item.
 - It evaluates suggestions using available context from imported notes (no separate project-context form).
 - It highlights improved lines and adds comment/recommendation text per line item.
+- It includes a complete 6-level OST structure check and recommends content for any blank level.
 - Line improvement logic is in `src/utils/suggestionReview.ts`.
 
 ### AI API configuration
