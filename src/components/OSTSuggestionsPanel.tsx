@@ -1,17 +1,14 @@
 import { useMemo, useState } from 'react';
-import type { OSTData } from '../types/ost';
 import type { DraftSuggestionCard } from '../types/ostSuggestion';
 import type { GeneratedOSTSuggestions, SuggestionConfidence } from '../types/ostSuggestion';
-import { buildOstReviewPrompt, runOstAiReview } from '../utils/aiReview';
 import {
-  serializeGeneratedSuggestionsForReview,
-  serializeOstForReview,
-} from '../utils/ostSerialize';
+  reviewDraftSuggestionLine,
+  type SuggestionLineReview,
+} from '../utils/suggestionReview';
 
 type OSTSuggestionsPanelProps = {
   suggestions: GeneratedOSTSuggestions | null;
   onApplySelected: (selectedCards: DraftSuggestionCard[]) => void;
-  ostData: OSTData;
   projectContext: string;
 };
 
@@ -28,6 +25,7 @@ type SectionProps = {
   items: GeneratedOSTSuggestions['opportunities'];
   isSelected: (id: string) => boolean;
   onToggle: (id: string) => void;
+  lineReviews: Record<string, SuggestionLineReview>;
 };
 
 function SuggestionSection({
@@ -37,6 +35,7 @@ function SuggestionSection({
   items,
   isSelected,
   onToggle,
+  lineReviews,
 }: SectionProps) {
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
@@ -76,6 +75,32 @@ function SuggestionSection({
                 </div>
               </div>
               <p className="mt-2 text-xs italic text-slate-600">{item.evidence}</p>
+
+              {lineReviews[item.id] ? (
+                <div className="mt-3 space-y-2">
+                  <div className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                      Improved line
+                    </p>
+                    <p className="mt-1 text-xs font-medium text-emerald-800">
+                      {lineReviews[item.id].improvedLine}
+                    </p>
+                    {lineReviews[item.id].recommendedQuote ? (
+                      <p className="mt-1 text-xs italic text-emerald-700">
+                        {lineReviews[item.id].recommendedQuote}
+                      </p>
+                    ) : null}
+                  </div>
+                  <p className="text-xs text-slate-700">
+                    <span className="font-semibold text-slate-800">Comment:</span>{' '}
+                    {lineReviews[item.id].comment}
+                  </p>
+                  <p className="text-xs text-slate-700">
+                    <span className="font-semibold text-slate-800">Recommendation:</span>{' '}
+                    {lineReviews[item.id].recommendation}
+                  </p>
+                </div>
+              ) : null}
             </article>
           ))
         )}
@@ -87,15 +112,8 @@ function SuggestionSection({
 export function OSTSuggestionsPanel({
   suggestions,
   onApplySelected,
-  ostData,
   projectContext,
 }: OSTSuggestionsPanelProps) {
-  const statusClasses = {
-    success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-    error: 'border-rose-200 bg-rose-50 text-rose-700',
-    info: 'border-slate-200 bg-slate-50 text-slate-700',
-  } as const;
-
   const generatedAtText = useMemo(() => {
     if (!suggestions) {
       return '';
@@ -111,25 +129,19 @@ export function OSTSuggestionsPanel({
   }, [suggestions]);
 
   const [selectionOverrides, setSelectionOverrides] = useState<Record<string, boolean>>({});
-  const [aiStatus, setAiStatus] = useState<{
-    type: keyof typeof statusClasses;
-    message: string;
-  } | null>(null);
-  const [aiOutput, setAiOutput] = useState('');
-  const [isAiRunning, setIsAiRunning] = useState(false);
 
   const isSelected = (id: string): boolean => selectionOverrides[id] ?? true;
 
   const selectedCards = allCards.filter((item) => isSelected(item.id));
-  const proposedOst = useMemo(() => {
-    if (suggestions) {
-      return serializeGeneratedSuggestionsForReview(suggestions, ostData);
-    }
-    return serializeOstForReview(ostData);
-  }, [ostData, suggestions]);
   const normalizedContext =
     projectContext.trim() ||
     'No explicit project context provided. Evaluate based on the current OST and available note-derived signals.';
+  const lineReviews = useMemo<Record<string, SuggestionLineReview>>(() => {
+    return allCards.reduce<Record<string, SuggestionLineReview>>((acc, card) => {
+      acc[card.id] = reviewDraftSuggestionLine(card, normalizedContext);
+      return acc;
+    }, {});
+  }, [allCards, normalizedContext]);
 
   const toggleSelection = (id: string) => {
     setSelectionOverrides((current) => ({
@@ -154,49 +166,6 @@ export function OSTSuggestionsPanel({
     setSelectionOverrides(nextOverrides);
   };
 
-  const handleCopyAiPrompt = async () => {
-    const prompt = buildOstReviewPrompt({
-      projectContext: normalizedContext,
-      proposedOst,
-    });
-    try {
-      await navigator.clipboard.writeText(prompt);
-      setAiStatus({
-        type: 'info',
-        message: 'AI review prompt copied to clipboard.',
-      });
-    } catch {
-      setAiStatus({
-        type: 'error',
-        message: 'Unable to copy prompt from this browser session.',
-      });
-    }
-  };
-
-  const handleRunAiReview = async () => {
-    setIsAiRunning(true);
-    setAiStatus({ type: 'info', message: 'Running AI resonance review...' });
-    const result = await runOstAiReview({
-      projectContext: normalizedContext,
-      proposedOst,
-    });
-    setIsAiRunning(false);
-
-    if (!result.ok) {
-      setAiStatus({ type: 'error', message: result.message });
-      return;
-    }
-
-    setAiOutput(result.report);
-    setAiStatus({
-      type: result.mode === 'offline' ? 'info' : 'success',
-      message:
-        result.mode === 'offline'
-          ? 'Generated review in offline advisory mode.'
-          : `AI review generated successfully using model: ${result.model}`,
-    });
-  };
-
   if (!suggestions) {
     return (
       <section className="rounded-2xl border border-dashed border-slate-300 bg-white p-6">
@@ -206,7 +175,7 @@ export function OSTSuggestionsPanel({
           solutions, and assumptions.
         </p>
         <p className="mt-2 text-xs text-slate-500">
-          AI resonance review will appear here after suggestions are generated.
+          Line-by-line auto-review and improved recommendations will appear here after generation.
         </p>
       </section>
     );
@@ -218,8 +187,8 @@ export function OSTSuggestionsPanel({
         <div>
           <h2 className="text-lg font-semibold text-slate-900">Generated OST suggestions</h2>
           <p className="mt-1 text-xs text-slate-600">
-            Draft cards extracted from imported notes. Select the cards you want to apply into the
-            live OST board.
+            Draft cards extracted from imported notes. Each line is auto-reviewed with improved
+            wording, comments, and recommendations.
           </p>
         </div>
         <div className="text-xs text-slate-500">Generated at: {generatedAtText}</div>
@@ -257,7 +226,21 @@ export function OSTSuggestionsPanel({
           </button>
           <button
             type="button"
-            onClick={() => onApplySelected(selectedCards)}
+            onClick={() =>
+              onApplySelected(
+                selectedCards.map((card) => {
+                  const review = lineReviews[card.id];
+                  if (!review) {
+                    return card;
+                  }
+                  return {
+                    ...card,
+                    title: review.improvedLine,
+                    evidence: review.recommendedQuote ?? card.evidence,
+                  };
+                }),
+              )
+            }
             disabled={selectedCards.length === 0}
             className="rounded-md bg-[#1D4ED8] px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
           >
@@ -274,6 +257,7 @@ export function OSTSuggestionsPanel({
           items={suggestions.opportunities}
           isSelected={isSelected}
           onToggle={toggleSelection}
+          lineReviews={lineReviews}
         />
         <SuggestionSection
           title="Draft solutions"
@@ -282,6 +266,7 @@ export function OSTSuggestionsPanel({
           items={suggestions.solutions}
           isSelected={isSelected}
           onToggle={toggleSelection}
+          lineReviews={lineReviews}
         />
         <SuggestionSection
           title="Draft assumptions"
@@ -290,50 +275,8 @@ export function OSTSuggestionsPanel({
           items={suggestions.assumptions}
           isSelected={isSelected}
           onToggle={toggleSelection}
+          lineReviews={lineReviews}
         />
-      </div>
-
-      <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-slate-900">
-              AI Assistant: Resonance review
-            </p>
-            <p className="mt-1 text-xs text-slate-600">
-              Embedded review of OST relevance and strategic fit based on imported notes and current
-              tree.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleCopyAiPrompt}
-              className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
-            >
-              Copy prompt
-            </button>
-            <button
-              type="button"
-              onClick={handleRunAiReview}
-              disabled={isAiRunning}
-              className="rounded-md bg-[#0F766E] px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:bg-teal-400"
-            >
-              {isAiRunning ? 'Running review...' : 'Run AI review'}
-            </button>
-          </div>
-        </div>
-
-        {aiStatus ? (
-          <div
-            className={`mt-3 rounded-lg border px-3 py-2 text-xs ${statusClasses[aiStatus.type]}`}
-          >
-            {aiStatus.message}
-          </div>
-        ) : null}
-
-        <pre className="mt-3 max-h-[420px] overflow-auto whitespace-pre-wrap rounded-lg border border-slate-200 bg-white p-3 text-xs leading-relaxed text-slate-700">
-          {aiOutput || 'No AI review generated yet.'}
-        </pre>
       </div>
     </section>
   );

@@ -94,7 +94,6 @@ export function OSTBoard({ initialData }: OSTBoardProps) {
             <OSTSuggestionsPanel
               suggestions={suggestions}
               onApplySelected={handleApplySelectedSuggestions}
-              ostData={ostData}
               projectContext={importedNote?.content ?? ''}
             />
           </div>
