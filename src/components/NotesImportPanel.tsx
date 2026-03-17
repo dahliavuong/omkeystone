@@ -73,34 +73,30 @@ export function NotesImportPanel({
     setStatus({ type: 'success', message: result.message });
   };
 
+  const handleGenerateSuggestionsClick = () => {
+    if (!importedNote) {
+      setStatus({
+        type: 'error',
+        message: 'Import notes first, then generate OST suggestions.',
+      });
+      return;
+    }
+
+    onGenerateSuggestions();
+    setStatus({
+      type: 'success',
+      message:
+        'Generated OST suggestions successfully. Review improved lines and recommendations below.',
+    });
+  };
+
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-semibold text-slate-900">Import raw notes</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            Upload workshop notes (.txt, .docx) or paste unstructured text directly.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onGenerateSuggestions}
-            disabled={!importedNote}
-            className="rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:bg-teal-700/45"
-          >
-            Generate OST suggestions
-          </button>
-          {importedNote ? (
-            <button
-              type="button"
-              onClick={onClearImportedNote}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
-            >
-              Clear imported note
-            </button>
-          ) : null}
-        </div>
+      <div>
+        <h2 className="text-lg font-semibold text-slate-900">Import raw notes</h2>
+        <p className="mt-1 text-sm text-slate-600">
+          Upload workshop notes (.txt, .docx) or paste unstructured text directly.
+        </p>
       </div>
       <p className="mt-2 text-xs text-slate-500">
         {importedNote
@@ -123,13 +119,32 @@ export function NotesImportPanel({
             className="mt-4 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-inner outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
           />
 
-          <button
-            type="button"
-            onClick={handleImportPastedText}
-            className="mt-4 rounded-lg bg-[#4338CA] px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
-          >
-            Import pasted notes
-          </button>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleImportPastedText}
+              className="rounded-lg bg-[#4338CA] px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
+            >
+              Import pasted notes
+            </button>
+            <button
+              type="button"
+              onClick={handleGenerateSuggestionsClick}
+              disabled={!importedNote}
+              className="rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:bg-teal-700/45"
+            >
+              Generate OST suggestions
+            </button>
+            {importedNote ? (
+              <button
+                type="button"
+                onClick={onClearImportedNote}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+              >
+                Clear imported note
+              </button>
+            ) : null}
+          </div>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
