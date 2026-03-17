@@ -1,9 +1,10 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { ImportedNote } from '../types/noteImport';
-import type { GeneratedOSTSuggestions } from '../types/ostSuggestion';
+import type { DraftSuggestionCard, GeneratedOSTSuggestions } from '../types/ostSuggestion';
 import type { OSTData } from '../types/ost';
 import { buildConnections } from '../utils/connector';
 import { getMaxBigOpportunities, getNodeId } from '../utils/layout';
+import { applySelectedSuggestionsToOST, createBlankOSTData } from '../utils/ostDraft';
 import { generateOSTSuggestionsFromImportedNote } from '../utils/ostSuggestion';
 import { ConnectorLayer } from './ConnectorLayer';
 import { LegendPanel } from './LegendPanel';
@@ -14,15 +15,17 @@ import { OSTSuggestionsPanel } from './OSTSuggestionsPanel';
 import { TreeBranch } from './TreeBranch';
 
 type OSTBoardProps = {
-  data: OSTData;
+  initialData?: OSTData;
 };
 
-export function OSTBoard({ data }: OSTBoardProps) {
+export function OSTBoard({ initialData }: OSTBoardProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const nodeElementsRef = useRef<Map<string, HTMLDivElement>>(new Map());
   const [nodeVersion, setNodeVersion] = useState(0);
+  const [ostData, setOstData] = useState<OSTData>(initialData ?? createBlankOSTData());
   const [importedNote, setImportedNote] = useState<ImportedNote | null>(null);
   const [suggestions, setSuggestions] = useState<GeneratedOSTSuggestions | null>(null);
+  const [applyStatus, setApplyStatus] = useState<string | null>(null);
 
   const registerNode = useCallback((id: string, element: HTMLDivElement | null) => {
     const current = nodeElementsRef.current.get(id);
@@ -39,18 +42,23 @@ export function OSTBoard({ data }: OSTBoardProps) {
     }
   }, []);
 
-  const connections = useMemo(() => buildConnections(data), [data]);
-  const maxBigOpportunityCount = getMaxBigOpportunities(data);
-  const branchWidth = Math.max(maxBigOpportunityCount * 360 + (maxBigOpportunityCount - 1) * 32, 1120);
+  const connections = useMemo(() => buildConnections(ostData), [ostData]);
+  const maxBigOpportunityCount = getMaxBigOpportunities(ostData);
+  const branchWidth = Math.max(
+    maxBigOpportunityCount * 360 + (maxBigOpportunityCount - 1) * 32,
+    1120,
+  );
 
   const handleImportedNote = (note: ImportedNote) => {
     setImportedNote(note);
     setSuggestions(null);
+    setApplyStatus(null);
   };
 
   const handleClearImportedNote = () => {
     setImportedNote(null);
     setSuggestions(null);
+    setApplyStatus(null);
   };
 
   const handleGenerateSuggestions = () => {
@@ -58,6 +66,17 @@ export function OSTBoard({ data }: OSTBoardProps) {
       return;
     }
     setSuggestions(generateOSTSuggestionsFromImportedNote(importedNote));
+    setApplyStatus(null);
+  };
+
+  const handleApplySelectedSuggestions = (selectedCards: DraftSuggestionCard[]) => {
+    if (selectedCards.length === 0) {
+      setApplyStatus('Select at least one suggestion card to apply.');
+      return;
+    }
+
+    setOstData((current) => applySelectedSuggestionsToOST(current, selectedCards));
+    setApplyStatus(`Applied ${selectedCards.length} selected suggestion(s) to the OST.`);
   };
 
   return (
@@ -76,8 +95,16 @@ export function OSTBoard({ data }: OSTBoardProps) {
               />
             </div>
             <div className="mx-auto mb-6 w-full max-w-[1800px] min-w-[980px]">
-              <OSTSuggestionsPanel suggestions={suggestions} />
+              <OSTSuggestionsPanel
+                suggestions={suggestions}
+                onApplySelected={handleApplySelectedSuggestions}
+              />
             </div>
+            {applyStatus ? (
+              <div className="mx-auto mb-6 w-full max-w-[1800px] min-w-[980px] rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                {applyStatus}
+              </div>
+            ) : null}
             <div
               ref={canvasRef}
               className="relative mx-auto flex min-w-max flex-col items-center gap-14 rounded-2xl border border-slate-200 bg-white p-10 shadow-sm"
@@ -93,7 +120,12 @@ export function OSTBoard({ data }: OSTBoardProps) {
                 <LevelRow title="Outcome">
                   <div className="flex justify-center">
                     <OSTCard
-                      title={data.outcome}
+                      title={ostData.outcome || 'Outcome not set yet'}
+                      subtitle={
+                        ostData.outcome
+                          ? undefined
+                          : 'Apply selected suggestions to start building the tree'
+                      }
                       variant="outcome"
                       className="w-[560px] py-4 text-center text-base"
                       nodeId={getNodeId.outcome()}
@@ -104,7 +136,13 @@ export function OSTBoard({ data }: OSTBoardProps) {
 
                 <LevelRow title="Opportunity Spaces">
                   <div className="flex items-start justify-center gap-12">
-                    {data.opportunitySpaces.map((space) => (
+                    {ostData.opportunitySpaces.length === 0 ? (
+                      <div className="w-[620px] rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-8 text-center text-sm text-slate-500">
+                        The OST is blank. Generate suggestions from imported notes, then apply
+                        selected cards to create your first branch.
+                      </div>
+                    ) : null}
+                    {ostData.opportunitySpaces.map((space) => (
                       <div key={space.id} style={{ width: `${branchWidth}px` }}>
                         <TreeBranch opportunitySpace={space} registerNode={registerNode} />
                       </div>

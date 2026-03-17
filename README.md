@@ -5,7 +5,7 @@ Structured React + TypeScript + Vite implementation of a workshop-ready Opportun
 ## Architecture choices
 
 - **Custom hierarchical layout (not React Flow):** the tree is rendered with deterministic rows/columns so it looks like a strategic planning board instead of a freeform node graph.
-- **Typed, data-driven model:** all board content lives in `src/data/ostData.ts` and is validated by types in `src/types/ost.ts`.
+- **Typed, data-driven model:** OST entities are validated by `src/types/ost.ts`, and the live board state is managed inside `OSTBoard`.
 - **Reusable components:**
   - `OSTBoard` orchestrates layout and node registration
   - `TreeBranch` renders one independent opportunity-space branch
@@ -15,8 +15,10 @@ Structured React + TypeScript + Vite implementation of a workshop-ready Opportun
 
 ## How to add or edit branches
 
-1. Open `src/data/ostData.ts`.
-2. Add or edit:
+The board now starts **blank by default**. You can populate it by applying generated suggestions or by setting your own state update flow in `OSTBoard`.
+
+1. Open `src/components/OSTBoard.tsx`.
+2. Update `ostData` state with:
    - `opportunitySpaces`
    - `bigOpportunities`
    - `smallerOpportunities`
@@ -46,7 +48,8 @@ Structured React + TypeScript + Vite implementation of a workshop-ready Opportun
   - opportunities (problem/opportunity signals)
   - solutions (action/initiative signals)
   - assumptions (belief/hypothesis signals)
-- Suggestion generation logic lives in `src/utils/ostSuggestion.ts` and is presented in `OSTSuggestionsPanel`.
+- Select any subset of draft cards and click **Apply selected to OST** to populate the blank tree.
+- Suggestion generation logic lives in `src/utils/ostSuggestion.ts`, and suggestion-to-tree mapping logic lives in `src/utils/ostDraft.ts`.
 
 ## Run locally
 

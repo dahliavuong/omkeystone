@@ -1,8 +1,10 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { DraftSuggestionCard } from '../types/ostSuggestion';
 import type { GeneratedOSTSuggestions, SuggestionConfidence } from '../types/ostSuggestion';
 
 type OSTSuggestionsPanelProps = {
   suggestions: GeneratedOSTSuggestions | null;
+  onApplySelected: (selectedCards: DraftSuggestionCard[]) => void;
 };
 
 const confidenceStyles: Record<SuggestionConfidence, string> = {
@@ -16,9 +18,18 @@ type SectionProps = {
   subtitle: string;
   cardClassName: string;
   items: GeneratedOSTSuggestions['opportunities'];
+  selectedIds: Set<string>;
+  onToggle: (id: string) => void;
 };
 
-function SuggestionSection({ title, subtitle, cardClassName, items }: SectionProps) {
+function SuggestionSection({
+  title,
+  subtitle,
+  cardClassName,
+  items,
+  selectedIds,
+  onToggle,
+}: SectionProps) {
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
       <p className="text-sm font-semibold text-slate-900">{title}</p>
@@ -31,14 +42,30 @@ function SuggestionSection({ title, subtitle, cardClassName, items }: SectionPro
           </p>
         ) : (
           items.map((item) => (
-            <article key={item.id} className={`rounded-lg border p-3 ${cardClassName}`}>
+            <article
+              key={item.id}
+              className={`rounded-lg border p-3 ${cardClassName} ${
+                selectedIds.has(item.id) ? 'ring-1 ring-slate-400' : ''
+              }`}
+            >
               <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-medium text-slate-900">{item.title}</p>
-                <span
-                  className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${confidenceStyles[item.confidence]}`}
-                >
-                  {item.confidence}
-                </span>
+                <div className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(item.id)}
+                    onChange={() => onToggle(item.id)}
+                    className="mt-0.5 h-3.5 w-3.5 rounded border-slate-300"
+                    aria-label={`Select suggestion: ${item.title}`}
+                  />
+                  <p className="text-sm font-medium text-slate-900">{item.title}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${confidenceStyles[item.confidence]}`}
+                  >
+                    {item.confidence}
+                  </span>
+                </div>
               </div>
               <p className="mt-2 text-xs italic text-slate-600">{item.evidence}</p>
             </article>
@@ -49,13 +76,55 @@ function SuggestionSection({ title, subtitle, cardClassName, items }: SectionPro
   );
 }
 
-export function OSTSuggestionsPanel({ suggestions }: OSTSuggestionsPanelProps) {
+export function OSTSuggestionsPanel({ suggestions, onApplySelected }: OSTSuggestionsPanelProps) {
   const generatedAtText = useMemo(() => {
     if (!suggestions) {
       return '';
     }
     return new Date(suggestions.generatedAt).toLocaleString();
   }, [suggestions]);
+
+  const allCards = useMemo(() => {
+    if (!suggestions) {
+      return [];
+    }
+    return [...suggestions.opportunities, ...suggestions.solutions, ...suggestions.assumptions];
+  }, [suggestions]);
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!suggestions) {
+      setSelectedIds(new Set());
+      return;
+    }
+    setSelectedIds(new Set(allCards.map((item) => item.id)));
+  }, [allCards, suggestions]);
+
+  const selectedCards = useMemo(
+    () => allCards.filter((item) => selectedIds.has(item.id)),
+    [allCards, selectedIds],
+  );
+
+  const toggleSelection = (id: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    setSelectedIds(new Set(allCards.map((item) => item.id)));
+  };
+
+  const handleClearSelection = () => {
+    setSelectedIds(new Set());
+  };
 
   if (!suggestions) {
     return (
@@ -75,22 +144,52 @@ export function OSTSuggestionsPanel({ suggestions }: OSTSuggestionsPanelProps) {
         <div>
           <h2 className="text-lg font-semibold text-slate-900">Generated OST suggestions</h2>
           <p className="mt-1 text-xs text-slate-600">
-            Draft cards extracted from imported notes. Review before adding to your canonical OST.
+            Draft cards extracted from imported notes. Select the cards you want to apply into the
+            live OST board.
           </p>
         </div>
         <div className="text-xs text-slate-500">Generated at: {generatedAtText}</div>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-600">
-        <span className="rounded-full bg-slate-200 px-2 py-1 font-medium text-slate-700">
-          Opportunities: {suggestions.opportunities.length}
-        </span>
-        <span className="rounded-full bg-slate-200 px-2 py-1 font-medium text-slate-700">
-          Solutions: {suggestions.solutions.length}
-        </span>
-        <span className="rounded-full bg-slate-200 px-2 py-1 font-medium text-slate-700">
-          Assumptions: {suggestions.assumptions.length}
-        </span>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2 text-xs text-slate-600">
+          <span className="rounded-full bg-slate-200 px-2 py-1 font-medium text-slate-700">
+            Opportunities: {suggestions.opportunities.length}
+          </span>
+          <span className="rounded-full bg-slate-200 px-2 py-1 font-medium text-slate-700">
+            Solutions: {suggestions.solutions.length}
+          </span>
+          <span className="rounded-full bg-slate-200 px-2 py-1 font-medium text-slate-700">
+            Assumptions: {suggestions.assumptions.length}
+          </span>
+          <span className="rounded-full bg-slate-200 px-2 py-1 font-medium text-slate-700">
+            Selected: {selectedCards.length}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleSelectAll}
+            className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Select all
+          </button>
+          <button
+            type="button"
+            onClick={handleClearSelection}
+            className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Clear selection
+          </button>
+          <button
+            type="button"
+            onClick={() => onApplySelected(selectedCards)}
+            disabled={selectedCards.length === 0}
+            className="rounded-md bg-[#1D4ED8] px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+          >
+            Apply selected to OST
+          </button>
+        </div>
       </div>
 
       <div className="mt-5 grid gap-4 xl:grid-cols-3">
@@ -99,18 +198,24 @@ export function OSTSuggestionsPanel({ suggestions }: OSTSuggestionsPanelProps) {
           subtitle="Auto-detected customer/business problems and opportunity statements."
           cardClassName="border-slate-200 bg-white"
           items={suggestions.opportunities}
+          selectedIds={selectedIds}
+          onToggle={toggleSelection}
         />
         <SuggestionSection
           title="Draft solutions"
           subtitle="Potential solution concepts inferred from action-oriented notes."
           cardClassName="border-[#D7CEFF] bg-[#EEEAFE]"
           items={suggestions.solutions}
+          selectedIds={selectedIds}
+          onToggle={toggleSelection}
         />
         <SuggestionSection
           title="Draft assumptions"
           subtitle="Beliefs and hypotheses requiring validation."
           cardClassName="border-[#F4CADC] bg-[#FDECF3]"
           items={suggestions.assumptions}
+          selectedIds={selectedIds}
+          onToggle={toggleSelection}
         />
       </div>
     </section>
