@@ -19,6 +19,58 @@ const statusStyles: Record<Status['type'], string> = {
   error: 'border-rose-200 bg-rose-50 text-rose-700',
 };
 
+type BulletLine = {
+  depth: number;
+  text: string;
+};
+
+const normalizeBulletDepth = (depth: number): number => {
+  return Math.max(0, Math.min(depth, 3));
+};
+
+const getDepthFromLinePrefix = (line: string, indentDepth: number): number => {
+  const numberedPrefix = line.match(/^(\d+(?:\.\d+)*)[.)]?\s+/);
+  if (numberedPrefix) {
+    const levels = numberedPrefix[1].split('.').length - 1;
+    return normalizeBulletDepth(levels);
+  }
+  return normalizeBulletDepth(indentDepth);
+};
+
+const parseNoteToBulletLines = (content: string): BulletLine[] => {
+  const normalizedContent = content.replace(/\r/g, '').trim();
+  if (!normalizedContent) {
+    return [];
+  }
+
+  const rawLines = normalizedContent.split('\n').filter((line) => line.trim().length > 0);
+  const sourceLines =
+    rawLines.length > 1
+      ? rawLines
+      : normalizedContent
+          .split(/(?<=[.!?])\s+/)
+          .map((line) => line.trim())
+          .filter(Boolean);
+
+  return sourceLines.slice(0, 80).map((rawLine) => {
+    const leadingSpaces = rawLine.match(/^\s*/)?.[0].length ?? 0;
+    const indentDepth = Math.floor(leadingSpaces / 2);
+    const depth = getDepthFromLinePrefix(rawLine.trimStart(), indentDepth);
+    const text = rawLine
+      .trim()
+      .replace(/^[-*•▪◦]\s+/, '')
+      .replace(/^\d+(?:\.\d+)*[.)]?\s+/, '')
+      .trim();
+
+    return {
+      depth,
+      text: text || '(empty line)',
+    };
+  });
+};
+
+const bulletByDepth = ['•', '◦', '▪', '–'];
+
 export function NotesImportPanel({
   importedNote,
   onImported,
@@ -35,6 +87,13 @@ export function NotesImportPanel({
       return '';
     }
     return new Date(importedNote.importedAt).toLocaleString();
+  }, [importedNote]);
+
+  const previewBulletLines = useMemo(() => {
+    if (!importedNote) {
+      return [];
+    }
+    return parseNoteToBulletLines(importedNote.content);
   }, [importedNote]);
 
   const handleImportFile = async () => {
@@ -200,10 +259,24 @@ export function NotesImportPanel({
             <p className="mt-2 text-xs text-slate-600">File: {importedNote.fileName}</p>
           ) : null}
           <p className="mt-3 text-sm font-medium text-slate-800">Imported note preview</p>
-          <p className="mt-1 max-h-24 overflow-auto whitespace-pre-wrap rounded-lg border border-slate-200 bg-white p-3 text-xs leading-relaxed text-slate-700">
-            {importedNote.content.slice(0, 800)}
-            {importedNote.content.length > 800 ? '…' : ''}
-          </p>
+          <div className="mt-1 max-h-40 overflow-auto rounded-lg border border-slate-200 bg-white p-3 text-xs leading-relaxed text-slate-700">
+            {previewBulletLines.length === 0 ? (
+              <p>No preview content available.</p>
+            ) : (
+              <ul className="space-y-1.5">
+                {previewBulletLines.map((line, index) => (
+                  <li
+                    key={`${line.text}-${index}`}
+                    className="flex items-start gap-2"
+                    style={{ paddingLeft: `${line.depth * 14}px` }}
+                  >
+                    <span className="mt-[1px] text-slate-500">{bulletByDepth[line.depth]}</span>
+                    <span>{line.text}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       ) : null}
     </section>
