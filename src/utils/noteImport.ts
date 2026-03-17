@@ -25,7 +25,7 @@ const hasReadableCharacters = (content: string): boolean => {
 };
 
 export const validateReadableContent = (rawContent: string): NoteImportResult => {
-  const content = rawContent.replace(/\u0000/g, '').trim();
+  const content = rawContent.split('\0').join('').trim();
 
   if (!content) {
     return {
@@ -77,10 +77,11 @@ export const importNoteFromFile = async (file: File): Promise<NoteImportResult> 
       message: 'Unsupported file type. Please upload a .txt or .docx file.',
     };
   }
+  const fileFormat = extension as 'txt' | 'docx';
 
   try {
     const rawContent =
-      extension === 'docx' ? await parseDocxFile(file) : await parseTextFile(file);
+      fileFormat === 'docx' ? await parseDocxFile(file) : await parseTextFile(file);
 
     const validated = validateReadableContent(rawContent);
     if (!validated.ok) {
@@ -91,7 +92,7 @@ export const importNoteFromFile = async (file: File): Promise<NoteImportResult> 
       ok: true,
       note: buildImportedNote({
         source: 'file',
-        format: extension,
+        format: fileFormat,
         fileName: file.name,
         content: validated.note.content,
       }),
