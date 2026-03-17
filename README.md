@@ -36,6 +36,13 @@ Structured React + TypeScript + Vite implementation of a workshop-ready Opportun
   - Smaller opportunities, then solutions, then assumptions below each parent
 - `ConnectorLayer` computes each card’s center anchor via DOM refs and draws orthogonal SVG paths (`M -> V -> H -> V`) so relationships stay readable and thin.
 
+## Raw notes import workflow
+
+- Import from **file** (`.txt`, `.docx`) or **paste raw text** directly in `NotesImportPanel`.
+- File and pasted content both pass through shared validation in `src/utils/noteImport.ts`.
+- Validation blocks empty/sparse/unreadable content and returns clear error messages.
+- Successful imports display source metadata, character/line counts, and a preview to confirm input quality before OST refinement.
+
 ## Run locally
 
 ```bash
