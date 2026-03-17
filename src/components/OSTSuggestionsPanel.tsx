@@ -3,7 +3,10 @@ import type { OSTData } from '../types/ost';
 import type { DraftSuggestionCard } from '../types/ostSuggestion';
 import type { GeneratedOSTSuggestions, SuggestionConfidence } from '../types/ostSuggestion';
 import { buildOstReviewPrompt, runOstAiReview } from '../utils/aiReview';
-import { serializeOstForReview } from '../utils/ostSerialize';
+import {
+  serializeGeneratedSuggestionsForReview,
+  serializeOstForReview,
+} from '../utils/ostSerialize';
 
 type OSTSuggestionsPanelProps = {
   suggestions: GeneratedOSTSuggestions | null;
@@ -118,7 +121,12 @@ export function OSTSuggestionsPanel({
   const isSelected = (id: string): boolean => selectionOverrides[id] ?? true;
 
   const selectedCards = allCards.filter((item) => isSelected(item.id));
-  const proposedOst = useMemo(() => serializeOstForReview(ostData), [ostData]);
+  const proposedOst = useMemo(() => {
+    if (suggestions) {
+      return serializeGeneratedSuggestionsForReview(suggestions, ostData);
+    }
+    return serializeOstForReview(ostData);
+  }, [ostData, suggestions]);
   const normalizedContext =
     projectContext.trim() ||
     'No explicit project context provided. Evaluate based on the current OST and available note-derived signals.';

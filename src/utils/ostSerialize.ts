@@ -1,4 +1,5 @@
 import type { OSTData } from '../types/ost';
+import type { GeneratedOSTSuggestions } from '../types/ostSuggestion';
 
 export const serializeOstForReview = (data: OSTData): string => {
   const lines: string[] = [];
@@ -60,6 +61,75 @@ export const serializeOstForReview = (data: OSTData): string => {
       });
     });
   });
+
+  return lines.join('\n');
+};
+
+export const serializeGeneratedSuggestionsForReview = (
+  suggestions: GeneratedOSTSuggestions,
+  currentOst: OSTData,
+): string => {
+  const lines: string[] = [];
+
+  lines.push('Generated OST suggestions (line-by-line source):');
+  lines.push('');
+
+  lines.push('Outcome:');
+  lines.push(currentOst.outcome?.trim() ? `- ${currentOst.outcome.trim()}` : '- (blank)');
+  lines.push('');
+
+  lines.push('Opportunity Spaces:');
+  if (currentOst.opportunitySpaces.length === 0) {
+    lines.push('- (blank)');
+  } else {
+    currentOst.opportunitySpaces.forEach((space, index) => {
+      lines.push(`${index + 1}. ${space.title}`);
+    });
+  }
+  lines.push('');
+
+  lines.push('Big Opportunities:');
+  const bigTitles = currentOst.opportunitySpaces.flatMap((space) =>
+    space.bigOpportunities.map((big) => big.title),
+  );
+  if (bigTitles.length === 0) {
+    lines.push('- (blank)');
+  } else {
+    bigTitles.forEach((title, index) => {
+      lines.push(`${index + 1}. ${title}`);
+    });
+  }
+  lines.push('');
+
+  lines.push('Smaller Opportunities / Problems (with plain italic quote):');
+  if (suggestions.opportunities.length === 0) {
+    lines.push('- (blank)');
+  } else {
+    suggestions.opportunities.forEach((opportunity, index) => {
+      lines.push(`${index + 1}. ${opportunity.title}`);
+      lines.push(`   quote: ${opportunity.evidence}`);
+    });
+  }
+  lines.push('');
+
+  lines.push('Solutions:');
+  if (suggestions.solutions.length === 0) {
+    lines.push('- (blank)');
+  } else {
+    suggestions.solutions.forEach((solution, index) => {
+      lines.push(`${index + 1}. ${solution.title}`);
+    });
+  }
+  lines.push('');
+
+  lines.push('Assumptions:');
+  if (suggestions.assumptions.length === 0) {
+    lines.push('- (blank)');
+  } else {
+    suggestions.assumptions.forEach((assumption, index) => {
+      lines.push(`${index + 1}. ${assumption.title}`);
+    });
+  }
 
   return lines.join('\n');
 };

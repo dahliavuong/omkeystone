@@ -54,7 +54,9 @@ The board now starts **blank by default**. You can populate it by applying gener
 ## AI assistant preview step (context resonance review)
 
 - AI assistant is embedded directly in `OSTSuggestionsPanel` (not a separate panel).
-- It evaluates the current OST snapshot against available context from imported notes (no separate project-context form).
+- It reviews generated suggestions line-by-line in one continuous sequence and proposes improved lines.
+- It evaluates suggestions using available context from imported notes (no separate project-context form).
+- It always includes all six OST levels in the improved output and proposes ideas for any blank levels.
 - Actions:
   - Run AI review in-app (structured critique output)
   - Copy full evaluation prompt for use in external LLM tools

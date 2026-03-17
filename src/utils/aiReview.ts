@@ -10,47 +10,32 @@ Prefer business relevance over wording quality.
 
 export const buildOstReviewPrompt = (input: OSTAIReviewInput): string => {
   return `
-Act as a senior Business Analyst and discovery advisor reviewing an Opportunity Solution Tree (OST) prepared for a client.
+Act as a senior Business Analyst and discovery advisor reviewing GENERATED OST SUGGESTIONS for a client.
 
-Use the provided project context as the source of truth, including:
-- Project background
-- Problem statement
-- Business case / rationale
-- Current challenges / pain points
-- Target future state
-- Strategic goals / outcomes
-- Customer or user needs
-- Constraints, assumptions, and dependencies
+Primary task:
+- Review the suggestions line by line and improve them one by one in the same sequence.
+- Keep the response as one continuous flow (do not split into separate analysis sections).
+- Ensure the improved version includes all required OST levels:
+  Outcome, Opportunity Spaces, Big Opportunities, Smaller Opportunities / Problems (with plain italic quote), Solutions, Assumptions.
+- If any level is blank, propose a concrete recommendation for that level based on the original notes context.
 
-Evaluate whether:
-- the outcome is meaningful and tied to business value
-- the opportunities are rooted in real user/business problems
-- the tree reflects the client's actual context rather than generic assumptions
-- the structure is logical and complete
-- the solution branches are traceable and not prematurely biased
-- the assumptions are explicit and testable
-- the OST is strong enough to support prioritization, stakeholder alignment, and next-step decision making
+Required output format:
+1) [Level] Original: ...
+   Improved: ...
+   Reason: ...
+2) [Level] Original: ...
+   Improved: ...
+   Reason: ...
+...
 
-Please provide the response in this exact structure:
-
-A. Overall Assessment
-- Overall resonance with project context: High / Medium / Low
-- Short explanation
-
-B. Strengths
-- List the strongest parts of the current OST
-
-C. Gaps / Concerns
-- List key issues, weaknesses, or misalignments
-
-D. Recommendations
-- Clear, actionable recommendations
-
-E. Suggested Improved OST
-- Revised outcome
-- Revised opportunities
-- Revised solution directions
-- Revised assumptions / questions to validate
+After the numbered line-by-line review, include one final block:
+Improved OST (single integrated version):
+- Outcome: ...
+- Opportunity Spaces: ...
+- Big Opportunities: ...
+- Smaller Opportunities / Problems (with plain italic quote): ...
+- Solutions: ...
+- Assumptions: ...
 
 Project Context:
 ${input.projectContext}
@@ -60,141 +45,164 @@ ${input.proposedOst}
 `.trim();
 };
 
-const containsAny = (text: string, terms: string[]): boolean => {
-  const lower = text.toLowerCase();
-  return terms.some((term) => lower.includes(term));
+type LineLevel =
+  | 'Outcome'
+  | 'Opportunity Spaces'
+  | 'Big Opportunities'
+  | 'Smaller Opportunities / Problems'
+  | 'Solutions'
+  | 'Assumptions';
+
+type ParsedLine = {
+  level: LineLevel;
+  original: string;
 };
 
-const countHits = (text: string, terms: string[]): number => {
-  const lower = text.toLowerCase();
-  return terms.reduce((count, term) => (lower.includes(term) ? count + 1 : count), 0);
+const REQUIRED_LEVELS: LineLevel[] = [
+  'Outcome',
+  'Opportunity Spaces',
+  'Big Opportunities',
+  'Smaller Opportunities / Problems',
+  'Solutions',
+  'Assumptions',
+];
+
+const sectionHeaderToLevel = (line: string): LineLevel | null => {
+  const normalized = line.toLowerCase().replace(/[:\s]/g, '');
+  if (normalized.startsWith('outcome')) return 'Outcome';
+  if (normalized.startsWith('opportunityspaces')) return 'Opportunity Spaces';
+  if (normalized.startsWith('bigopportunities')) return 'Big Opportunities';
+  if (normalized.startsWith('smalleropportunities/problems'))
+    return 'Smaller Opportunities / Problems';
+  if (normalized.startsWith('smalleropportunities')) return 'Smaller Opportunities / Problems';
+  if (normalized.startsWith('solutions')) return 'Solutions';
+  if (normalized.startsWith('assumptions')) return 'Assumptions';
+  return null;
 };
 
-const inferResonance = (context: string, ost: string): 'High' | 'Medium' | 'Low' => {
-  const contextTerms = context
-    .toLowerCase()
-    .split(/[^a-z0-9]+/g)
-    .filter((token) => token.length > 4);
-  const uniqueTerms = [...new Set(contextTerms)].slice(0, 60);
-  const overlap = uniqueTerms.filter((term) => ost.toLowerCase().includes(term)).length;
+const extractLines = (proposedOst: string): ParsedLine[] => {
+  const parsed: ParsedLine[] = [];
+  let currentLevel: LineLevel | null = null;
 
-  if (overlap >= 12) {
-    return 'High';
+  for (const rawLine of proposedOst.split('\n')) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    const headerLevel = sectionHeaderToLevel(line);
+    if (headerLevel) {
+      currentLevel = headerLevel;
+      continue;
+    }
+
+    if (!currentLevel) {
+      continue;
+    }
+
+    const isContentLine =
+      /^[-*]/.test(line) ||
+      /^\d+(\.\d+)*[.)]?\s+/.test(line) ||
+      line.toLowerCase().startsWith('quote:');
+
+    if (!isContentLine) {
+      continue;
+    }
+
+    parsed.push({
+      level: currentLevel,
+      original: line.replace(/^[-*]\s*/, '').trim(),
+    });
   }
-  if (overlap >= 6) {
-    return 'Medium';
+
+  const hasLevel = new Set(parsed.map((item) => item.level));
+  for (const level of REQUIRED_LEVELS) {
+    if (!hasLevel.has(level)) {
+      parsed.push({ level, original: '(blank)' });
+    }
   }
-  return 'Low';
+
+  return parsed;
+};
+
+const contextHint = (context: string, fallback: string): string => {
+  const firstSentence =
+    context
+      .split(/[.!?]\s+/)
+      .map((part) => part.trim())
+      .find((part) => part.length > 30) ?? fallback;
+  return firstSentence.length > 140 ? `${firstSentence.slice(0, 137)}...` : firstSentence;
+};
+
+const improveLine = (line: ParsedLine, context: string): string => {
+  const source = line.original;
+  const sourceIsBlank = !source || source === '(blank)' || source === '(none yet)';
+
+  if (line.level === 'Outcome') {
+    return sourceIsBlank
+      ? `Increase measurable business value by addressing key note-derived pains: ${contextHint(context, 'improve user and business outcomes')}`
+      : source;
+  }
+
+  if (line.level === 'Opportunity Spaces') {
+    return sourceIsBlank
+      ? 'Customer journey and operational enablement'
+      : source.replace(/^(\d+(\.\d+)*)\s*/, '');
+  }
+
+  if (line.level === 'Big Opportunities') {
+    return sourceIsBlank ? 'Unified cross-functional opportunity themes' : source;
+  }
+
+  if (line.level === 'Smaller Opportunities / Problems') {
+    if (source.toLowerCase().startsWith('quote:')) {
+      return source.replace(/^quote:\s*/i, '_').concat('_');
+    }
+    return sourceIsBlank
+      ? `Problem: unclear pain pattern from notes. _"${contextHint(context, 'Users report friction in current journeys.')}"_`
+      : source;
+  }
+
+  if (line.level === 'Solutions') {
+    return sourceIsBlank ? 'Run a focused pilot solution mapped to top-priority problem' : source;
+  }
+
+  return sourceIsBlank
+    ? 'Assume proposed solution can deliver measurable impact; validate with a lightweight experiment'
+    : source;
 };
 
 const runOfflineReview = (input: OSTAIReviewInput): OSTAIReviewResult => {
   const context = input.projectContext;
-  const ost = input.proposedOst;
-  const resonance = inferResonance(context, ost);
+  const lines = extractLines(input.proposedOst);
+  const improved = lines.map((line) => ({
+    ...line,
+    improved: improveLine(line, context),
+  }));
 
-  const hasOutcome = containsAny(ost, ['outcome']);
-  const hasOpportunities = containsAny(ost, ['opportunity']);
-  const hasSolutions = containsAny(ost, ['solution']);
-  const hasAssumptions = containsAny(ost, ['assumption']);
-  const hasPainPointSignals = countHits(context, [
-    'pain',
-    'challenge',
-    'friction',
-    'problem',
-    'blocker',
-  ]);
-  const hasFutureStateSignals = countHits(context, ['future state', 'target state', 'north star']);
-  const hasGoalSignals = countHits(context, ['goal', 'outcome', 'kpi', 'business value']);
-  const hasConstraintSignals = countHits(context, [
-    'constraint',
-    'dependency',
-    'risk',
-    'assumption',
-  ]);
-  const solutionBiasRisk =
-    countHits(ost, ['solution', 'build', 'implement', 'launch']) >
-    countHits(ost, ['opportunity', 'problem', 'pain']);
+  const items = improved.map(
+    (item, index) =>
+      `${index + 1}) [${item.level}] Original: ${item.original}\n   Improved: ${item.improved}\n   Reason: ${
+        item.original === '(blank)' || item.original === '(none yet)'
+          ? 'Original content is blank, so a context-based recommendation was proposed.'
+          : 'Improved for clearer business relevance and stronger OST wording.'
+      }`,
+  );
 
-  const strengths: string[] = [];
-  const concerns: string[] = [];
-  const recommendations: string[] = [];
-
-  if (hasOutcome) strengths.push('The OST includes an explicit outcome anchor.');
-  else concerns.push('Outcome statement is missing or unclear.');
-
-  if (hasOpportunities) strengths.push('Opportunity framing is present in the tree.');
-  else concerns.push('Opportunity layer appears weak or absent.');
-
-  if (hasSolutions) strengths.push('Solution directions are documented and actionable.');
-  else concerns.push('Solution directions are missing, making prioritization difficult.');
-
-  if (hasAssumptions) strengths.push('Assumptions are at least partially explicit.');
-  else concerns.push('Assumptions are not explicit, which weakens validation planning.');
-
-  if (hasPainPointSignals < 2) {
-    concerns.push('Project context does not clearly articulate current pain points/blockers.');
-    recommendations.push(
-      'Strengthen context evidence with concrete pain points, affected users, and impact metrics.',
-    );
-  }
-
-  if (hasFutureStateSignals === 0) {
-    concerns.push('Target future state is under-specified.');
-    recommendations.push(
-      'Define a sharper future-state narrative and connect each major branch to it.',
-    );
-  }
-
-  if (hasGoalSignals === 0) {
-    concerns.push('Business goals/outcomes are not explicit enough for prioritization.');
-    recommendations.push(
-      'Add measurable business outcomes (e.g., retention, conversion, wallet share, cycle-time).',
-    );
-  }
-
-  if (hasConstraintSignals === 0) {
-    concerns.push('Constraints/dependencies are weakly represented.');
-    recommendations.push(
-      'Explicitly state major constraints and dependencies next to relevant assumptions.',
-    );
-  }
-
-  if (solutionBiasRisk) {
-    concerns.push('Tree may be solution-biased relative to opportunity evidence.');
-    recommendations.push(
-      'Rebalance by rewriting opportunities as user/business problems before finalizing solutions.',
-    );
-  }
-
-  if (recommendations.length === 0) {
-    recommendations.push(
-      'Prioritize top 3 opportunity branches using impact x confidence x feasibility scoring.',
-    );
-  }
+  const collectLevel = (level: LineLevel): string[] =>
+    improved
+      .filter((item) => item.level === level)
+      .map((item) => item.improved)
+      .filter((value) => value && value !== '(blank)');
 
   const report = `
-A. Overall Assessment
-- Overall resonance with project context: ${resonance}
-- Short explanation: This offline advisory review estimates resonance from context-to-OST signal overlap and structural completeness checks.
+${items.join('\n\n')}
 
-B. Strengths
-${strengths.map((item) => `- ${item}`).join('\n') || '- No material strengths detected from current input.'}
-
-C. Gaps / Concerns
-${concerns.map((item) => `- ${item}`).join('\n') || '- No major structural concerns detected, but deeper stakeholder validation is still recommended.'}
-
-D. Recommendations
-${recommendations.map((item) => `- ${item}`).join('\n')}
-
-E. Suggested Improved OST
-- Revised outcome:
-  - Define one measurable business outcome statement tied to value (e.g., growth, retention, efficiency).
-- Revised opportunities:
-  - Rewrite opportunities as specific user/business problems with evidence source and affected segment.
-- Revised solution directions:
-  - Keep solution areas broad and testable, mapped one-to-many against validated opportunities.
-- Revised assumptions / questions to validate:
-  - For each solution, add explicit assumptions, confidence level, and the fastest validation method.
+Improved OST (single integrated version):
+- Outcome: ${collectLevel('Outcome')[0] ?? 'Increase measurable business value from note-derived priority opportunities'}
+- Opportunity Spaces: ${collectLevel('Opportunity Spaces').slice(0, 3).join(' | ') || 'Customer journey and operational enablement'}
+- Big Opportunities: ${collectLevel('Big Opportunities').slice(0, 4).join(' | ') || 'Unified cross-functional opportunity themes'}
+- Smaller Opportunities / Problems (with plain italic quote): ${collectLevel('Smaller Opportunities / Problems').slice(0, 4).join(' | ') || 'Problem: unclear pain pattern from notes. _"Users report friction in current journeys."_'}
+- Solutions: ${collectLevel('Solutions').slice(0, 4).join(' | ') || 'Run a focused pilot solution mapped to top-priority problem'}
+- Assumptions: ${collectLevel('Assumptions').slice(0, 4).join(' | ') || 'Assume proposed solution can deliver measurable impact; validate with a lightweight experiment'}
 `.trim();
 
   return {
