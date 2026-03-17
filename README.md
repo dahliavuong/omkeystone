@@ -51,6 +51,31 @@ The board now starts **blank by default**. You can populate it by applying gener
 - Select any subset of draft cards and click **Apply selected to OST** to populate the blank tree.
 - Suggestion generation logic lives in `src/utils/ostSuggestion.ts`, and suggestion-to-tree mapping logic lives in `src/utils/ostDraft.ts`.
 
+## AI assistant preview step (context resonance review)
+
+- `OSTAIAssistantPanel` adds a preview step that evaluates OST quality against project context.
+- Inputs:
+  - Project context (background, problem, business case, constraints, future state, needs)
+  - Proposed OST (auto-load from current board snapshot or pasted manually)
+- Actions:
+  - Run AI review in-app (structured critique output)
+  - Copy full evaluation prompt for use in external LLM tools
+- Prompt and API integration logic is in `src/utils/aiReview.ts`.
+- OST snapshot serialization for review is in `src/utils/ostSerialize.ts`.
+
+### AI API configuration
+
+Set environment variables before running dev/preview:
+
+```bash
+VITE_LLM_API_KEY=your_api_key
+# Optional overrides
+VITE_LLM_MODEL=gpt-4o-mini
+VITE_LLM_API_URL=https://api.openai.com/v1/chat/completions
+```
+
+If `VITE_LLM_API_KEY` is missing, the app still works and lets you copy the full structured review prompt.
+
 ## Run locally
 
 ```bash

@@ -10,6 +10,7 @@ import { ConnectorLayer } from './ConnectorLayer';
 import { LegendPanel } from './LegendPanel';
 import { LevelRow } from './LevelRow';
 import { NotesImportPanel } from './NotesImportPanel';
+import { OSTAIAssistantPanel } from './OSTAIAssistantPanel';
 import { OSTCard } from './OSTCard';
 import { OSTSuggestionsPanel } from './OSTSuggestionsPanel';
 import { TreeBranch } from './TreeBranch';
@@ -99,6 +100,9 @@ export function OSTBoard({ initialData }: OSTBoardProps) {
                 suggestions={suggestions}
                 onApplySelected={handleApplySelectedSuggestions}
               />
+            </div>
+            <div className="mx-auto mb-6 w-full max-w-[1800px] min-w-[980px]">
+              <OSTAIAssistantPanel ostData={ostData} />
             </div>
             {applyStatus ? (
               <div className="mx-auto mb-6 w-full max-w-[1800px] min-w-[980px] rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
