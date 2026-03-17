@@ -5,7 +5,7 @@ import { buildOrthogonalPath } from '../utils/connector';
 
 type ConnectorLayerProps = {
   canvasRef: RefObject<HTMLDivElement | null>;
-  nodeElements: Map<string, HTMLDivElement>;
+  nodeElementsRef: RefObject<Map<string, HTMLDivElement>>;
   connections: NodeConnection[];
   version: number;
 };
@@ -17,7 +17,7 @@ type PathSegment = {
 
 export function ConnectorLayer({
   canvasRef,
-  nodeElements,
+  nodeElementsRef,
   connections,
   version,
 }: ConnectorLayerProps) {
@@ -31,6 +31,7 @@ export function ConnectorLayer({
 
     const recalculatePaths = () => {
       const canvasRect = canvas.getBoundingClientRect();
+      const nodeElements = nodeElementsRef.current;
       const nextPaths: PathSegment[] = [];
 
       for (const connection of connections) {
@@ -61,7 +62,7 @@ export function ConnectorLayer({
 
     const resizeObserver = new ResizeObserver(() => recalculatePaths());
     resizeObserver.observe(canvas);
-    for (const node of nodeElements.values()) {
+    for (const node of nodeElementsRef.current.values()) {
       resizeObserver.observe(node);
     }
     window.addEventListener('resize', recalculatePaths);
@@ -70,7 +71,7 @@ export function ConnectorLayer({
       resizeObserver.disconnect();
       window.removeEventListener('resize', recalculatePaths);
     };
-  }, [canvasRef, connections, nodeElements, version]);
+  }, [canvasRef, connections, nodeElementsRef, version]);
 
   return (
     <svg

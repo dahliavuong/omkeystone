@@ -49,7 +49,7 @@ export function OSTBoard({ data }: OSTBoardProps) {
             >
               <ConnectorLayer
                 canvasRef={canvasRef}
-                nodeElements={nodeElementsRef.current}
+                nodeElementsRef={nodeElementsRef}
                 connections={connections}
                 version={nodeVersion}
               />
