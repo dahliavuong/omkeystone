@@ -1,13 +1,16 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { ImportedNote } from '../types/noteImport';
+import type { GeneratedOSTSuggestions } from '../types/ostSuggestion';
 import type { OSTData } from '../types/ost';
 import { buildConnections } from '../utils/connector';
 import { getMaxBigOpportunities, getNodeId } from '../utils/layout';
+import { generateOSTSuggestionsFromImportedNote } from '../utils/ostSuggestion';
 import { ConnectorLayer } from './ConnectorLayer';
 import { LegendPanel } from './LegendPanel';
 import { LevelRow } from './LevelRow';
 import { NotesImportPanel } from './NotesImportPanel';
 import { OSTCard } from './OSTCard';
+import { OSTSuggestionsPanel } from './OSTSuggestionsPanel';
 import { TreeBranch } from './TreeBranch';
 
 type OSTBoardProps = {
@@ -19,6 +22,7 @@ export function OSTBoard({ data }: OSTBoardProps) {
   const nodeElementsRef = useRef<Map<string, HTMLDivElement>>(new Map());
   const [nodeVersion, setNodeVersion] = useState(0);
   const [importedNote, setImportedNote] = useState<ImportedNote | null>(null);
+  const [suggestions, setSuggestions] = useState<GeneratedOSTSuggestions | null>(null);
 
   const registerNode = useCallback((id: string, element: HTMLDivElement | null) => {
     const current = nodeElementsRef.current.get(id);
@@ -39,6 +43,23 @@ export function OSTBoard({ data }: OSTBoardProps) {
   const maxBigOpportunityCount = getMaxBigOpportunities(data);
   const branchWidth = Math.max(maxBigOpportunityCount * 360 + (maxBigOpportunityCount - 1) * 32, 1120);
 
+  const handleImportedNote = (note: ImportedNote) => {
+    setImportedNote(note);
+    setSuggestions(null);
+  };
+
+  const handleClearImportedNote = () => {
+    setImportedNote(null);
+    setSuggestions(null);
+  };
+
+  const handleGenerateSuggestions = () => {
+    if (!importedNote) {
+      return;
+    }
+    setSuggestions(generateOSTSuggestionsFromImportedNote(importedNote));
+  };
+
   return (
     <div className="min-h-screen bg-[#F6F8FB] text-slate-800">
       <div className="flex">
@@ -49,9 +70,13 @@ export function OSTBoard({ data }: OSTBoardProps) {
             <div className="mx-auto mb-6 w-full max-w-[1800px] min-w-[980px]">
               <NotesImportPanel
                 importedNote={importedNote}
-                onImported={setImportedNote}
-                onClearImportedNote={() => setImportedNote(null)}
+                onImported={handleImportedNote}
+                onClearImportedNote={handleClearImportedNote}
+                onGenerateSuggestions={handleGenerateSuggestions}
               />
+            </div>
+            <div className="mx-auto mb-6 w-full max-w-[1800px] min-w-[980px]">
+              <OSTSuggestionsPanel suggestions={suggestions} />
             </div>
             <div
               ref={canvasRef}

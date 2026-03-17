@@ -42,6 +42,11 @@ Structured React + TypeScript + Vite implementation of a workshop-ready Opportun
 - File and pasted content both pass through shared validation in `src/utils/noteImport.ts`.
 - Validation blocks empty/sparse/unreadable content and returns clear error messages.
 - Successful imports display source metadata, character/line counts, and a preview to confirm input quality before OST refinement.
+- Run **Generate OST suggestions** to create draft cards auto-detected from imported notes:
+  - opportunities (problem/opportunity signals)
+  - solutions (action/initiative signals)
+  - assumptions (belief/hypothesis signals)
+- Suggestion generation logic lives in `src/utils/ostSuggestion.ts` and is presented in `OSTSuggestionsPanel`.
 
 ## Run locally
 

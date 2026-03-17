@@ -6,6 +6,7 @@ type NotesImportPanelProps = {
   importedNote: ImportedNote | null;
   onImported: (note: ImportedNote) => void;
   onClearImportedNote: () => void;
+  onGenerateSuggestions: () => void;
 };
 
 type Status = {
@@ -22,6 +23,7 @@ export function NotesImportPanel({
   importedNote,
   onImported,
   onClearImportedNote,
+  onGenerateSuggestions,
 }: NotesImportPanelProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [pastedText, setPastedText] = useState('');
@@ -81,13 +83,22 @@ export function NotesImportPanel({
           </p>
         </div>
         {importedNote ? (
-          <button
-            type="button"
-            onClick={onClearImportedNote}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
-          >
-            Clear imported note
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onGenerateSuggestions}
+              className="rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white transition hover:bg-teal-700"
+            >
+              Generate OST suggestions
+            </button>
+            <button
+              type="button"
+              onClick={onClearImportedNote}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+            >
+              Clear imported note
+            </button>
+          </div>
         ) : null}
       </div>
 
