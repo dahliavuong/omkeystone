@@ -1,4 +1,6 @@
 import { generateOSTSuggestionsFromText } from './ostSuggestion';
+import { runOstAiReview } from './aiReview';
+import type { OSTData } from '../types/ost';
 
 type BuildDraftOptions = {
   fillMissing: boolean;
@@ -6,7 +8,7 @@ type BuildDraftOptions = {
 
 type RefinementResult = {
   preview: string;
-  mode: 'offline';
+  mode: 'offline' | 'llm';
 };
 
 const clean = (value: string): string =>
@@ -153,13 +155,272 @@ export const refineDraftOstPreview = async (
   rawNote: string,
   currentDraftPreview: string,
 ): Promise<RefinementResult> => {
-  const hasBlank = /:\s*$/.test(currentDraftPreview);
-  if (!hasBlank) {
-    return { preview: currentDraftPreview, mode: 'offline' };
+  const aiResult = await runOstAiReview({
+    projectContext: rawNote,
+    proposedOst: currentDraftPreview,
+  });
+
+  if (aiResult.ok) {
+    const parsedFromReview = extractPreviewFromAiReport(aiResult.report);
+    if (parsedFromReview) {
+      return { preview: parsedFromReview, mode: aiResult.mode };
+    }
   }
 
   return {
     preview: buildDraftOstPreviewFromRawNote(rawNote, { fillMissing: true }),
     mode: 'offline',
   };
+};
+
+const fallbackLabel = (value: string, fallback: string): string => {
+  const normalized = value.trim();
+  return normalized || fallback;
+};
+
+const splitPipeList = (value: string): string[] =>
+  value
+    .split('|')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+const extractPreviewFromAiReport = (report: string): string | null => {
+  const outcomeMatch = report.match(/- Outcome:\s*(.+)/i);
+  const spaceMatch = report.match(/- Opportunity Spaces:\s*(.+)/i);
+  const bigMatch = report.match(/- Big Opportunities:\s*(.+)/i);
+  const smallMatch = report.match(/- Smaller Opportunities \/ Problems(?: \(with plain italic quote\))?:\s*(.+)/i);
+  const solutionMatch = report.match(/- Solutions:\s*(.+)/i);
+  const assumptionMatch = report.match(/- Assumptions:\s*(.+)/i);
+
+  if (!outcomeMatch && !spaceMatch && !bigMatch) {
+    return null;
+  }
+
+  const outcome = fallbackLabel(outcomeMatch?.[1] ?? '', '');
+  const spaces = splitPipeList(spaceMatch?.[1] ?? '');
+  const bigOpps = splitPipeList(bigMatch?.[1] ?? '');
+  const smallOpps = splitPipeList(smallMatch?.[1] ?? '');
+  const solutions = splitPipeList(solutionMatch?.[1] ?? '');
+  const assumptions = splitPipeList(assumptionMatch?.[1] ?? '');
+
+  const lines: string[] = [];
+  lines.push(`Outcome: ${outcome}`);
+  lines.push(`- Opps space 1: ${spaces[0] ?? ''}`);
+  lines.push(`    - Big opp 1: ${bigOpps[0] ?? ''}`);
+  lines.push(`        - Small opp 1: ${smallOpps[0] ?? ''}`);
+  lines.push(`            - Solution 1: ${solutions[0] ?? ''}`);
+  lines.push(`                - Assumption 1: ${assumptions[0] ?? ''}`);
+  lines.push(`                - Assumption 2: ${assumptions[1] ?? ''}`);
+  lines.push(`            - Solution 2: ${solutions[1] ?? ''}`);
+  lines.push(`        - Small opp 2: ${smallOpps[1] ?? ''}`);
+  lines.push(`            - Solution 1: ${solutions[2] ?? ''}`);
+  lines.push(`                - Assumption 1: ${assumptions[2] ?? ''}`);
+  lines.push(`    - Big opp 2: ${bigOpps[1] ?? ''}`);
+  lines.push(`    - Big opp 3: ${bigOpps[2] ?? ''}`);
+  lines.push(`- Opps space 2: ${spaces[1] ?? ''}`);
+  lines.push(`    - Big opp 1: ${bigOpps[3] ?? ''}`);
+  lines.push(`    - Big opp 2: ${bigOpps[4] ?? ''}`);
+  lines.push(`    - Big opp 3: ${bigOpps[5] ?? ''}`);
+
+  return lines.join('\n');
+};
+
+const slug = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
+    .slice(0, 48);
+
+const makeId = (prefix: string, title: string): string => {
+  const normalized = slug(title) || 'item';
+  return `${prefix}-${normalized}-${crypto.randomUUID().slice(0, 6)}`;
+};
+
+const extractValue = (line: string, pattern: RegExp): string => {
+  const match = line.match(pattern);
+  return match?.[1]?.trim() ?? '';
+};
+
+export const parseDraftPreviewToOstData = (preview: string): OSTData => {
+  const lines = preview
+    .replace(/\r/g, '')
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .filter((line) => line.trim().length > 0);
+
+  const outcomeLine = lines.find((line) => /^Outcome\s*:/i.test(line)) ?? '';
+  const outcome = extractValue(outcomeLine, /^Outcome\s*:\s*(.*)$/i);
+
+  const data: OSTData = {
+    outcome: outcome || 'Outcome not defined',
+    opportunitySpaces: [],
+  };
+
+  let currentSpace: OSTData['opportunitySpaces'][number] | null = null;
+  let currentBig: OSTData['opportunitySpaces'][number]['bigOpportunities'][number] | null = null;
+  let currentSmall:
+    | OSTData['opportunitySpaces'][number]['bigOpportunities'][number]['smallerOpportunities'][number]
+    | null = null;
+  let currentSolution:
+    | OSTData['opportunitySpaces'][number]['bigOpportunities'][number]['smallerOpportunities'][number]['solutions'][number]
+    | null = null;
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (/^Outcome\s*:/i.test(line)) {
+      continue;
+    }
+
+    const oppSpaceTitle = extractValue(line, /^-\s*Opps?\s*space\s*\d*\s*:\s*(.*)$/i);
+    if (oppSpaceTitle || /^-\s*Opps?\s*space/i.test(line)) {
+      currentSpace = {
+        id: makeId('space', oppSpaceTitle || 'Opportunity Space'),
+        title: oppSpaceTitle || 'Opportunity Space',
+        bigOpportunities: [],
+      };
+      data.opportunitySpaces.push(currentSpace);
+      currentBig = null;
+      currentSmall = null;
+      currentSolution = null;
+      continue;
+    }
+
+    const bigTitle = extractValue(line, /^-\s*Big\s*opp\s*\d*\s*:\s*(.*)$/i);
+    if (bigTitle || /^-\s*Big\s*opp/i.test(line)) {
+      if (!currentSpace) {
+        currentSpace = {
+          id: makeId('space', 'Opportunity Space'),
+          title: 'Opportunity Space',
+          bigOpportunities: [],
+        };
+        data.opportunitySpaces.push(currentSpace);
+      }
+      currentBig = {
+        id: makeId('big', bigTitle || 'Big Opportunity'),
+        title: bigTitle || 'Big Opportunity',
+        smallerOpportunities: [],
+      };
+      currentSpace.bigOpportunities.push(currentBig);
+      currentSmall = null;
+      currentSolution = null;
+      continue;
+    }
+
+    const smallTitle = extractValue(line, /^-\s*Small\s*opp\s*\d*\s*:\s*(.*)$/i);
+    if (smallTitle || /^-\s*Small\s*opp/i.test(line)) {
+      if (!currentSpace) {
+        currentSpace = {
+          id: makeId('space', 'Opportunity Space'),
+          title: 'Opportunity Space',
+          bigOpportunities: [],
+        };
+        data.opportunitySpaces.push(currentSpace);
+      }
+      if (!currentBig) {
+        currentBig = {
+          id: makeId('big', 'Big Opportunity'),
+          title: 'Big Opportunity',
+          smallerOpportunities: [],
+        };
+        currentSpace.bigOpportunities.push(currentBig);
+      }
+      currentSmall = {
+        id: makeId('small', smallTitle || 'Smaller Opportunity'),
+        title: smallTitle || 'Smaller Opportunity',
+        quote: '',
+        solutions: [],
+      };
+      currentBig.smallerOpportunities.push(currentSmall);
+      currentSolution = null;
+      continue;
+    }
+
+    const solutionTitle = extractValue(line, /^-\s*Solution\s*\d*\s*:\s*(.*)$/i);
+    if (solutionTitle || /^-\s*Solution/i.test(line)) {
+      if (!currentSpace) {
+        currentSpace = {
+          id: makeId('space', 'Opportunity Space'),
+          title: 'Opportunity Space',
+          bigOpportunities: [],
+        };
+        data.opportunitySpaces.push(currentSpace);
+      }
+      if (!currentBig) {
+        currentBig = {
+          id: makeId('big', 'Big Opportunity'),
+          title: 'Big Opportunity',
+          smallerOpportunities: [],
+        };
+        currentSpace.bigOpportunities.push(currentBig);
+      }
+      if (!currentSmall) {
+        currentSmall = {
+          id: makeId('small', 'Smaller Opportunity'),
+          title: 'Smaller Opportunity',
+          quote: '',
+          solutions: [],
+        };
+        currentBig.smallerOpportunities.push(currentSmall);
+      }
+      currentSolution = {
+        id: makeId('solution', solutionTitle || 'Solution'),
+        title: solutionTitle || 'Solution',
+        assumptions: [],
+      };
+      currentSmall.solutions.push(currentSolution);
+      continue;
+    }
+
+    const assumptionTitle = extractValue(line, /^-\s*Assumption\s*\d*\s*:\s*(.*)$/i);
+    if (assumptionTitle || /^-\s*Assumption/i.test(line)) {
+      if (!currentSpace) {
+        currentSpace = {
+          id: makeId('space', 'Opportunity Space'),
+          title: 'Opportunity Space',
+          bigOpportunities: [],
+        };
+        data.opportunitySpaces.push(currentSpace);
+      }
+      if (!currentBig) {
+        currentBig = {
+          id: makeId('big', 'Big Opportunity'),
+          title: 'Big Opportunity',
+          smallerOpportunities: [],
+        };
+        currentSpace.bigOpportunities.push(currentBig);
+      }
+      if (!currentSmall) {
+        currentSmall = {
+          id: makeId('small', 'Smaller Opportunity'),
+          title: 'Smaller Opportunity',
+          quote: '',
+          solutions: [],
+        };
+        currentBig.smallerOpportunities.push(currentSmall);
+      }
+      if (!currentSolution) {
+        currentSolution = {
+          id: makeId('solution', 'Solution'),
+          title: 'Solution',
+          assumptions: [],
+        };
+        currentSmall.solutions.push(currentSolution);
+      }
+      currentSolution.assumptions.push({
+        id: makeId('assumption', assumptionTitle || 'Assumption'),
+        text: assumptionTitle || 'Assumption',
+      });
+    }
+  }
+
+  if (data.opportunitySpaces.length === 0) {
+    data.opportunitySpaces.push({
+      id: makeId('space', 'Opportunity Space'),
+      title: 'Opportunity Space',
+      bigOpportunities: [],
+    });
+  }
+
+  return data;
 };

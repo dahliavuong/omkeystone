@@ -10,7 +10,7 @@ type NotesImportPanelProps = {
   importedNote: ImportedNote | null;
   onImported: (note: ImportedNote) => void;
   onClearImportedNote: () => void;
-  onGenerateSuggestions: (sourceText?: string) => void;
+  onGenerateOst: (previewText?: string) => void;
 };
 
 type Status = {
@@ -27,7 +27,7 @@ export function NotesImportPanel({
   importedNote,
   onImported,
   onClearImportedNote,
-  onGenerateSuggestions,
+  onGenerateOst,
 }: NotesImportPanelProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [pastedText, setPastedText] = useState('');
@@ -96,20 +96,19 @@ export function NotesImportPanel({
     onClearImportedNote();
   };
 
-  const handleGenerateSuggestionsClick = () => {
+  const handleGenerateOstClick = () => {
     if (!importedNote) {
       setStatus({
         type: 'error',
-        message: 'Import notes first, then generate OST suggestions.',
+        message: 'Import notes first, then generate OST.',
       });
       return;
     }
 
-    onGenerateSuggestions(previewText || importedNote.content);
+    onGenerateOst(previewText || importedNote.content);
     setStatus({
       type: 'success',
-      message:
-        'Generated OST suggestions successfully. Review improved lines and recommendations below.',
+      message: 'Generated OST successfully from reviewed preview.',
     });
   };
 
@@ -142,8 +141,8 @@ export function NotesImportPanel({
       </div>
       <p className="mt-2 text-xs text-slate-500">
         {importedNote
-          ? 'Ready to generate draft opportunities, solutions, and assumptions.'
-          : 'Import or paste notes first, then generate OST suggestions.'}
+          ? 'Ready to review/refine preview and generate OST.'
+          : 'Import or paste notes first, then review and generate OST.'}
       </p>
 
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
@@ -171,11 +170,11 @@ export function NotesImportPanel({
             </button>
             <button
               type="button"
-              onClick={handleGenerateSuggestionsClick}
+              onClick={handleGenerateOstClick}
               disabled={!importedNote}
               className="rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:bg-teal-700/45"
             >
-              Generate OST suggestions
+              Generate OST
             </button>
             {importedNote ? (
               <button
@@ -249,10 +248,16 @@ export function NotesImportPanel({
           {importedNote.fileName ? (
             <p className="mt-2 text-xs text-slate-600">File: {importedNote.fileName}</p>
           ) : null}
-          <p className="mt-3 text-sm font-medium text-slate-800">Imported note preview</p>
-          <pre className="mt-1 max-h-72 overflow-auto whitespace-pre rounded-lg border border-slate-200 bg-white p-3 text-xs leading-relaxed text-slate-700">
-            {previewText || 'No preview content available.'}
-          </pre>
+          <p className="mt-3 text-sm font-medium text-slate-800">
+            Imported note preview (editable draft OST)
+          </p>
+          <textarea
+            value={previewText}
+            onChange={(event) => setDraftPreview(event.target.value)}
+            rows={18}
+            placeholder="Draft OST preview will appear here after import..."
+            className="mt-1 max-h-96 w-full overflow-auto whitespace-pre rounded-lg border border-slate-200 bg-white p-3 font-mono text-xs leading-relaxed text-slate-700 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+          />
         </div>
       ) : null}
     </section>

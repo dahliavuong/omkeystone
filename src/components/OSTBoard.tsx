@@ -1,20 +1,14 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { ImportedNote } from '../types/noteImport';
-import type { DraftSuggestionCard, GeneratedOSTSuggestions } from '../types/ostSuggestion';
 import type { OSTData } from '../types/ost';
 import { buildConnections } from '../utils/connector';
 import { getMaxBigOpportunities, getNodeId } from '../utils/layout';
-import {
-  applySelectedSuggestionsToOST,
-  createBlankOSTData,
-  type ApplyStructureSeeds,
-} from '../utils/ostDraft';
-import { generateOSTSuggestionsFromText } from '../utils/ostSuggestion';
+import { createBlankOSTData } from '../utils/ostDraft';
+import { parseDraftPreviewToOstData } from '../utils/draftPreview';
 import { ConnectorLayer } from './ConnectorLayer';
 import { LevelRow } from './LevelRow';
 import { NotesImportPanel } from './NotesImportPanel';
 import { OSTCard } from './OSTCard';
-import { OSTSuggestionsPanel } from './OSTSuggestionsPanel';
 import { TreeBranch } from './TreeBranch';
 
 type OSTBoardProps = {
@@ -27,8 +21,7 @@ export function OSTBoard({ initialData }: OSTBoardProps) {
   const [nodeVersion, setNodeVersion] = useState(0);
   const [ostData, setOstData] = useState<OSTData>(initialData ?? createBlankOSTData());
   const [importedNote, setImportedNote] = useState<ImportedNote | null>(null);
-  const [suggestions, setSuggestions] = useState<GeneratedOSTSuggestions | null>(null);
-  const [applyStatus, setApplyStatus] = useState<string | null>(null);
+  const [flowStatus, setFlowStatus] = useState<string | null>(null);
 
   const registerNode = useCallback((id: string, element: HTMLDivElement | null) => {
     const current = nodeElementsRef.current.get(id);
@@ -54,36 +47,21 @@ export function OSTBoard({ initialData }: OSTBoardProps) {
 
   const handleImportedNote = (note: ImportedNote) => {
     setImportedNote(note);
-    setSuggestions(null);
-    setApplyStatus(null);
+    setFlowStatus(null);
   };
 
   const handleClearImportedNote = () => {
     setImportedNote(null);
-    setSuggestions(null);
-    setApplyStatus(null);
+    setFlowStatus(null);
   };
 
-  const handleGenerateSuggestions = (sourceText?: string) => {
+  const handleGenerateOstFromPreview = (previewText?: string) => {
     if (!importedNote) {
       return;
     }
-    const inputText = sourceText?.trim() || importedNote.content;
-    setSuggestions(generateOSTSuggestionsFromText(inputText, importedNote.id));
-    setApplyStatus(null);
-  };
-
-  const handleApplySelectedSuggestions = (
-    selectedCards: DraftSuggestionCard[],
-    seeds?: ApplyStructureSeeds,
-  ) => {
-    if (selectedCards.length === 0) {
-      setApplyStatus('Select at least one suggestion card to apply.');
-      return;
-    }
-
-    setOstData((current) => applySelectedSuggestionsToOST(current, selectedCards, seeds));
-    setApplyStatus(`Applied ${selectedCards.length} selected suggestion(s) to the OST.`);
+    const sourceText = previewText?.trim() || importedNote.content;
+    setOstData(parseDraftPreviewToOstData(sourceText));
+    setFlowStatus('Generated OST successfully from the reviewed preview.');
   };
 
   return (
@@ -95,20 +73,12 @@ export function OSTBoard({ initialData }: OSTBoardProps) {
               importedNote={importedNote}
               onImported={handleImportedNote}
               onClearImportedNote={handleClearImportedNote}
-              onGenerateSuggestions={handleGenerateSuggestions}
+              onGenerateOst={handleGenerateOstFromPreview}
             />
           </div>
-          <div className="mx-auto mb-6 w-full max-w-[1800px] min-w-[980px]">
-            <OSTSuggestionsPanel
-              suggestions={suggestions}
-              onApplySelected={handleApplySelectedSuggestions}
-              ostData={ostData}
-              projectContext={importedNote?.content ?? ''}
-            />
-          </div>
-          {applyStatus ? (
+          {flowStatus ? (
             <div className="mx-auto mb-6 w-full max-w-[1800px] min-w-[980px] rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-              {applyStatus}
+              {flowStatus}
             </div>
           ) : null}
           <div
@@ -128,9 +98,7 @@ export function OSTBoard({ initialData }: OSTBoardProps) {
                   <OSTCard
                     title={ostData.outcome || 'Outcome not set yet'}
                     subtitle={
-                      ostData.outcome
-                        ? undefined
-                        : 'Apply selected suggestions to start building the tree'
+                      ostData.outcome ? undefined : 'Generate OST from reviewed preview to start'
                     }
                     variant="outcome"
                     className="w-[560px] py-4 text-center text-base"
@@ -144,8 +112,8 @@ export function OSTBoard({ initialData }: OSTBoardProps) {
                 <div className="flex items-start justify-center gap-12">
                   {ostData.opportunitySpaces.length === 0 ? (
                     <div className="w-[620px] rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-8 text-center text-sm text-slate-500">
-                      The OST is blank. Generate suggestions from imported notes, then apply
-                      selected cards to create your first branch.
+                      The OST is blank. Import notes, review and refine preview, then click Generate
+                      OST.
                     </div>
                   ) : null}
                   {ostData.opportunitySpaces.map((space) => (

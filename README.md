@@ -42,29 +42,22 @@ The board now starts **blank by default**. You can populate it by applying gener
 - Import from **file** (`.txt`, `.docx`) or **paste raw text** directly in `NotesImportPanel`.
 - File and pasted content both pass through shared validation in `src/utils/noteImport.ts`.
 - Validation blocks empty/sparse/unreadable content and returns clear error messages.
-- Successful imports display source metadata, character/line counts, and an auto-detected **draft OST bullet preview**.
-- Missing draft parts are left blank initially so teams can review incompleteness explicitly.
-- Use **AI review & refine preview** to improve the draft preview before generating suggestions.
-- Run **Generate OST suggestions** to create draft cards auto-detected from imported notes:
-  - opportunities (problem/opportunity signals)
-  - solutions (action/initiative signals)
-  - assumptions (belief/hypothesis signals)
-- Suggestions are generated from the reviewed preview text (not only raw note text).
-- Select any subset of draft cards and click **Apply selected to OST** to populate the blank tree.
-- Suggestion generation logic lives in `src/utils/ostSuggestion.ts`, and suggestion-to-tree mapping logic lives in `src/utils/ostDraft.ts`.
-
-## AI assistant preview step (context resonance review)
-
-- AI assistant is embedded directly in `OSTSuggestionsPanel` (not a separate panel).
-- It automatically reviews generated suggestions line-by-line and proposes improved lines under each item.
-- It evaluates suggestions using available context from imported notes (no separate project-context form).
-- It highlights improved lines and adds comment/recommendation text per line item.
-- It includes a complete 6-level OST structure check and recommends content for any blank level.
-- Line improvement logic is in `src/utils/suggestionReview.ts`.
+- Successful imports display source metadata, character/line counts, and an auto-detected **draft OST bullet preview** in this exact hierarchy:
+  - Outcome
+  - Opps space
+  - Big opp
+  - Small opp
+  - Solution
+  - Assumption
+- Missing draft parts remain blank initially to make incompleteness visible.
+- The preview box is **editable**.
+- Use **AI review & refine preview** to improve/fill the draft preview before generation.
+- Use **Generate OST** to build the board directly from the reviewed preview text.
+- Draft preview logic lives in `src/utils/draftPreview.ts`.
 
 ### AI API configuration
 
-The embedded line-by-line reviewer works in-app without external API configuration.
+The preview refinement step can use an API key if configured, and falls back to offline refinement when key/config is unavailable.
 
 ## Run locally
 
