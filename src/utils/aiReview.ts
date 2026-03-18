@@ -2,29 +2,101 @@ import type { OSTAIReviewInput, OSTAIReviewResult } from '../types/aiReview';
 
 const SYSTEM_PROMPT = `
 You are an experienced Business Analyst, Product Strategist, and Discovery Lead.
-Refine a draft OST preview from raw workshop notes.
-Improve business relevance and wording quality.
-Keep structure strict and workshop-ready.
+Review the proposed OST against project context from raw notes.
+Be critical but constructive, business-focused, and precise.
 `.trim();
 
 export const buildOstReviewPrompt = (input: OSTAIReviewInput): string => {
   return `
-Task:
-- Review and refine the draft OST preview using the project context.
-- Keep exactly this template and hierarchy.
-- Fill blank parts with concrete recommendations from context.
-- Keep text concise and specific.
+You are an experienced Business Analyst, Product Strategist, and Discovery Lead. Review the Opportunity Solution Tree (OST) I propose for a client and evaluate whether it truly resonates with the project context.
 
-Return ONLY the refined preview using this exact structure:
+Your task is to assess the quality, relevance, and strategic fit of the OST against the following context inputs from raw note:
+* Project background
+* Problem statement
+* Business case / rationale
+* Current challenges / pain points
+* Target future state
+* Strategic goals / outcomes
+* Customer or user needs
+* Constraints, assumptions, and dependencies
+
+Please perform the evaluation in a structured way.
+
+1. Context Understanding
+   First, summarize your understanding of:
+* The business context
+* The core problem(s) this project is trying to solve
+* Why this matters to the client
+* The intended future state or business outcomes
+
+2. OST Evaluation
+   Evaluate the proposed OST across these dimensions:
+* Alignment to business problem
+* Alignment to business case
+* Relevance to current challenges
+* Fit to future state
+* Logical structure
+* Completeness
+* Clarity
+* Prioritization readiness
+* Strategic coherence
+* Risk of solution bias
+
+3. Gap Analysis
+   Identify:
+* Misalignments between the OST and the project context
+* Missing opportunities or weak branches
+* Opportunity statements that are too broad, vague, duplicated, or solution-led
+* Solutions that do not clearly trace back to validated opportunities
+* Assumptions that need validation but are not stated
+* Any branch that may not resonate with executive stakeholders or business users, and why
+
+4. Recommendations
+   Provide practical recommendations to improve the OST, including:
+* What should be rewritten
+* What should be added
+* What should be merged or removed
+* How to make the opportunity statements more meaningful and evidence-based
+* How to better connect the tree to business value and future-state outcomes
+* How to strengthen prioritization and stakeholder buy-in
+
+5. Improved Version
+   Where possible, suggest a revised version of:
+* The outcome statement
+* Opportunity space
+* Big Opportunity statements
+* Smaller Opportunity statements
+* Solution areas
+* Assumptions / validation questions
+
+6. Output Format
+Please provide:
+A. Overall Assessment
+B. Strengths
+C. Gaps / Concerns
+D. Recommendations
+E. Suggested Improved each statement
+
+Important guidance:
+* Be critical but constructive
+* Do not just validate the OST at face value
+* Prioritize business relevance over wording
+* Flag generic or solution-driven logic
+* Keep recommendations suitable for client-facing advisory context
+
+After section E, provide this final machine-readable block exactly:
+Refined Preview Template:
 Outcome: <text>
 - Opps space 1: <text>
     - Big opp 1: <text>
         - Small opp 1: <text>
+            - Quote: _"<text>"_
             - Solution 1: <text>
                 - Assumption 1: <text>
                 - Assumption 2: <text>
             - Solution 2: <text>
         - Small opp 2: <text>
+            - Quote: _"<text>"_
             - Solution 1: <text>
                 - Assumption 1: <text>
     - Big opp 2: <text>
@@ -33,6 +105,8 @@ Outcome: <text>
     - Big opp 1: <text>
     - Big opp 2: <text>
     - Big opp 3: <text>
+
+If any part is blank in the draft, recommend content based on context.
 
 Project Context:
 ${input.projectContext}
@@ -70,11 +144,13 @@ const fillTemplate = (context: string, draft: string): string => {
     `- Opps space 1: ${getValue(/^-+\s*Opps?\s*space\s*1:\s*/i, 'Customer journey and experience')}`,
     `    - Big opp 1: ${getValue(/^-+\s*Big\s*opp\s*1:\s*/i, 'Resolve highest-impact journey friction')}`,
     `        - Small opp 1: ${getValue(/^-+\s*Small\s*opp\s*1:\s*/i, 'Users face a critical problem in current flow')}`,
+    `            - Quote: ${getValue(/^-+\s*Quote\s*:\s*/i, '_"Users struggle in the current journey due to key friction points."_')}`,
     `            - Solution 1: ${getValue(/^-+\s*Solution\s*1:\s*/i, 'Pilot a focused intervention')}`,
     `                - Assumption 1: ${getValue(/^-+\s*Assumption\s*1:\s*/i, 'Users will adopt the improved flow')}`,
     `                - Assumption 2: ${getValue(/^-+\s*Assumption\s*2:\s*/i, 'Execution is feasible within constraints')}`,
     `            - Solution 2: ${getValue(/^-+\s*Solution\s*2:\s*/i, 'Introduce a secondary support mechanism')}`,
     `        - Small opp 2: ${getValue(/^-+\s*Small\s*opp\s*2:\s*/i, 'Secondary user/business problem cluster')}`,
+    `            - Quote: ${getValue(/^-+\s*Quote\s*:\s*/i, '_"Current process blockers reduce confidence and throughput."_')}`,
     `            - Solution 1: ${getValue(/^-+\s*Solution\s*1:\s*/i, 'Deliver an incremental quick-win')}`,
     `                - Assumption 1: ${getValue(/^-+\s*Assumption\s*1:\s*/i, 'The quick-win has measurable impact')}`,
     `    - Big opp 2: ${getValue(/^-+\s*Big\s*opp\s*2:\s*/i, 'Improve supporting capabilities')}`,

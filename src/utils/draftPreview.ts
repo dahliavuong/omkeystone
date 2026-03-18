@@ -111,6 +111,9 @@ export const buildDraftOstPreviewFromRawNote = (
     `        - Small opp 1: ${nextValue(opportunityTitles, oppCursor, 'Specific user or business problem', options)}`,
   );
   lines.push(
+    `            - Quote: ${nextValue(opportunityTitles, oppCursor, '_"User pain-point statement from notes."_', options)}`,
+  );
+  lines.push(
     `            - Solution 1: ${nextValue(solutionTitles, solCursor, 'Pilot targeted intervention', options)}`,
   );
   lines.push(
@@ -124,6 +127,9 @@ export const buildDraftOstPreviewFromRawNote = (
   );
   lines.push(
     `        - Small opp 2: ${nextValue(opportunityTitles, oppCursor, 'Another concrete problem statement', options)}`,
+  );
+  lines.push(
+    `            - Quote: ${nextValue(opportunityTitles, oppCursor, '_"Second pain-point statement from notes."_', options)}`,
   );
   lines.push(
     `            - Solution 1: ${nextValue(solutionTitles, solCursor, 'Focused quick-win solution', options)}`,
@@ -173,56 +179,53 @@ export const refineDraftOstPreview = async (
   };
 };
 
-const fallbackLabel = (value: string, fallback: string): string => {
-  const normalized = value.trim();
-  return normalized || fallback;
-};
-
-const splitPipeList = (value: string): string[] =>
-  value
-    .split('|')
-    .map((item) => item.trim())
-    .filter(Boolean);
-
 const extractPreviewFromAiReport = (report: string): string | null => {
-  const outcomeMatch = report.match(/- Outcome:\s*(.+)/i);
-  const spaceMatch = report.match(/- Opportunity Spaces:\s*(.+)/i);
-  const bigMatch = report.match(/- Big Opportunities:\s*(.+)/i);
-  const smallMatch = report.match(/- Smaller Opportunities \/ Problems(?: \(with plain italic quote\))?:\s*(.+)/i);
-  const solutionMatch = report.match(/- Solutions:\s*(.+)/i);
-  const assumptionMatch = report.match(/- Assumptions:\s*(.+)/i);
+  const normalized = report.replace(/\r/g, '');
+  const allLines = normalized.split('\n');
+  const markerIndex = allLines.findIndex((line) =>
+    /Refined Preview Template\s*:/i.test(line.trim()),
+  );
+  const searchStart = markerIndex >= 0 ? markerIndex + 1 : 0;
+  const outcomeIndex =
+    allLines.findIndex((line, index) => index >= searchStart && /^Outcome\s*:/i.test(line.trim()));
 
-  if (!outcomeMatch && !spaceMatch && !bigMatch) {
+  if (outcomeIndex === -1) {
     return null;
   }
 
-  const outcome = fallbackLabel(outcomeMatch?.[1] ?? '', '');
-  const spaces = splitPipeList(spaceMatch?.[1] ?? '');
-  const bigOpps = splitPipeList(bigMatch?.[1] ?? '');
-  const smallOpps = splitPipeList(smallMatch?.[1] ?? '');
-  const solutions = splitPipeList(solutionMatch?.[1] ?? '');
-  const assumptions = splitPipeList(assumptionMatch?.[1] ?? '');
+  const allowedLine = (line: string): boolean => {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      return false;
+    }
+    return (
+      /^Outcome\s*:/i.test(trimmed) ||
+      /^-\s*Opps?\s*space/i.test(trimmed) ||
+      /^-\s*Big\s*opp/i.test(trimmed) ||
+      /^-\s*Small\s*opp/i.test(trimmed) ||
+      /^-\s*Quote\s*:/i.test(trimmed) ||
+      /^-\s*Solution/i.test(trimmed) ||
+      /^-\s*Assumption/i.test(trimmed)
+    );
+  };
 
-  const lines: string[] = [];
-  lines.push(`Outcome: ${outcome}`);
-  lines.push(`- Opps space 1: ${spaces[0] ?? ''}`);
-  lines.push(`    - Big opp 1: ${bigOpps[0] ?? ''}`);
-  lines.push(`        - Small opp 1: ${smallOpps[0] ?? ''}`);
-  lines.push(`            - Solution 1: ${solutions[0] ?? ''}`);
-  lines.push(`                - Assumption 1: ${assumptions[0] ?? ''}`);
-  lines.push(`                - Assumption 2: ${assumptions[1] ?? ''}`);
-  lines.push(`            - Solution 2: ${solutions[1] ?? ''}`);
-  lines.push(`        - Small opp 2: ${smallOpps[1] ?? ''}`);
-  lines.push(`            - Solution 1: ${solutions[2] ?? ''}`);
-  lines.push(`                - Assumption 1: ${assumptions[2] ?? ''}`);
-  lines.push(`    - Big opp 2: ${bigOpps[1] ?? ''}`);
-  lines.push(`    - Big opp 3: ${bigOpps[2] ?? ''}`);
-  lines.push(`- Opps space 2: ${spaces[1] ?? ''}`);
-  lines.push(`    - Big opp 1: ${bigOpps[3] ?? ''}`);
-  lines.push(`    - Big opp 2: ${bigOpps[4] ?? ''}`);
-  lines.push(`    - Big opp 3: ${bigOpps[5] ?? ''}`);
+  const previewLines: string[] = [];
+  for (let i = outcomeIndex; i < allLines.length; i += 1) {
+    const line = allLines[i];
+    if (allowedLine(line)) {
+      previewLines.push(line);
+      continue;
+    }
+    if (previewLines.length > 0 && line.trim() === '') {
+      break;
+    }
+  }
 
-  return lines.join('\n');
+  if (previewLines.length < 4) {
+    return null;
+  }
+
+  return previewLines.join('\n');
 };
 
 const slug = (value: string): string =>
@@ -240,6 +243,10 @@ const makeId = (prefix: string, title: string): string => {
 const extractValue = (line: string, pattern: RegExp): string => {
   const match = line.match(pattern);
   return match?.[1]?.trim() ?? '';
+};
+
+const cleanQuote = (value: string): string => {
+  return value.replace(/^_+/, '').replace(/_+$/, '').trim();
 };
 
 export const parseDraftPreviewToOstData = (preview: string): OSTData => {
@@ -333,6 +340,14 @@ export const parseDraftPreviewToOstData = (preview: string): OSTData => {
       };
       currentBig.smallerOpportunities.push(currentSmall);
       currentSolution = null;
+      continue;
+    }
+
+    const quoteText = extractValue(line, /^-\s*Quote\s*:\s*(.*)$/i);
+    if (quoteText || /^-\s*Quote\s*:/i.test(line)) {
+      if (currentSmall) {
+        currentSmall.quote = cleanQuote(quoteText) || currentSmall.quote;
+      }
       continue;
     }
 

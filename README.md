@@ -14,7 +14,7 @@ Structured React + TypeScript + Vite implementation of a workshop-ready Opportun
 
 ## How to add or edit branches
 
-The board now starts **blank by default**. You can populate it by applying generated suggestions or by setting your own state update flow in `OSTBoard`.
+The board now starts **blank by default**. You populate it by generating OST from the reviewed preview text (or by setting your own state update flow in `OSTBoard`).
 
 1. Open `src/components/OSTBoard.tsx`.
 2. Update `ostData` state with:
@@ -54,6 +54,7 @@ The board now starts **blank by default**. You can populate it by applying gener
 - Use **AI review & refine preview** to improve/fill the draft preview before generation.
 - Use **Generate OST** to build the board directly from the reviewed preview text.
 - Draft preview logic lives in `src/utils/draftPreview.ts`.
+- AI prompt + evaluation logic for refinement lives in `src/utils/aiReview.ts`.
 
 ### AI API configuration
 
