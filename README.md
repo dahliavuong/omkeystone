@@ -42,11 +42,14 @@ The board now starts **blank by default**. You can populate it by applying gener
 - Import from **file** (`.txt`, `.docx`) or **paste raw text** directly in `NotesImportPanel`.
 - File and pasted content both pass through shared validation in `src/utils/noteImport.ts`.
 - Validation blocks empty/sparse/unreadable content and returns clear error messages.
-- Successful imports display source metadata, character/line counts, and a preview to confirm input quality before OST refinement.
+- Successful imports display source metadata, character/line counts, and an auto-detected **draft OST bullet preview**.
+- Missing draft parts are left blank initially so teams can review incompleteness explicitly.
+- Use **AI review & refine preview** to improve the draft preview before generating suggestions.
 - Run **Generate OST suggestions** to create draft cards auto-detected from imported notes:
   - opportunities (problem/opportunity signals)
   - solutions (action/initiative signals)
   - assumptions (belief/hypothesis signals)
+- Suggestions are generated from the reviewed preview text (not only raw note text).
 - Select any subset of draft cards and click **Apply selected to OST** to populate the blank tree.
 - Suggestion generation logic lives in `src/utils/ostSuggestion.ts`, and suggestion-to-tree mapping logic lives in `src/utils/ostDraft.ts`.
 

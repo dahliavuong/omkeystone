@@ -64,11 +64,11 @@ const normalizeLine = (line: string): string => {
     .trim();
 };
 
-const splitLines = (content: string): string[] => {
+const splitLines = (content: string, minLength = 16): string[] => {
   return content
     .split(/\r?\n+/)
     .map((line) => normalizeLine(line))
-    .filter((line) => line.length >= 16);
+    .filter((line) => line.length >= minLength);
 };
 
 const toCanonicalKey = (value: string): string => {
@@ -177,10 +177,30 @@ const takeTop = (items: DraftSuggestionCard[], maxItems: number): DraftSuggestio
     .slice(0, maxItems);
 };
 
-export const generateOSTSuggestionsFromImportedNote = (
-  note: ImportedNote,
+const stripHierarchyPrefix = (line: string): string => {
+  return line
+    .replace(
+      /^(outcome|opps?\s*space\s*\d*|opp(?:ortunity)?\s*space\s*\d*|big\s*opp\s*\d*|small\s*opp\s*\d*|solution\s*\d*|assumption\s*\d*)\s*:\s*/i,
+      '',
+    )
+    .trim();
+};
+
+const isPureHierarchyHeader = (line: string): boolean => {
+  return /^(outcome|opps?\s*space\s*\d*|opp(?:ortunity)?\s*space\s*\d*|big\s*opp\s*\d*|small\s*opp\s*\d*|solution\s*\d*|assumption\s*\d*)\s*:?\s*$/i.test(
+    line,
+  );
+};
+
+export const generateOSTSuggestionsFromText = (
+  sourceText: string,
+  sourceNoteId = 'manual',
 ): GeneratedOSTSuggestions => {
-  const lines = splitLines(note.content);
+  const lines = splitLines(sourceText, 4)
+    .map((line) => stripHierarchyPrefix(line))
+    .filter((line) => !isPureHierarchyHeader(line))
+    .filter((line) => line.length > 2);
+
   const seen = new Set<string>();
   const opportunities: DraftSuggestionCard[] = [];
   const solutions: DraftSuggestionCard[] = [];
@@ -206,10 +226,16 @@ export const generateOSTSuggestionsFromImportedNote = (
   }
 
   return {
-    sourceNoteId: note.id,
+    sourceNoteId,
     generatedAt: new Date().toISOString(),
     opportunities: takeTop(opportunities, 8),
     solutions: takeTop(solutions, 8),
     assumptions: takeTop(assumptions, 8),
   };
+};
+
+export const generateOSTSuggestionsFromImportedNote = (
+  note: ImportedNote,
+): GeneratedOSTSuggestions => {
+  return generateOSTSuggestionsFromText(note.content, note.id);
 };

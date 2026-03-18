@@ -9,7 +9,7 @@ import {
   createBlankOSTData,
   type ApplyStructureSeeds,
 } from '../utils/ostDraft';
-import { generateOSTSuggestionsFromImportedNote } from '../utils/ostSuggestion';
+import { generateOSTSuggestionsFromText } from '../utils/ostSuggestion';
 import { ConnectorLayer } from './ConnectorLayer';
 import { LevelRow } from './LevelRow';
 import { NotesImportPanel } from './NotesImportPanel';
@@ -64,11 +64,12 @@ export function OSTBoard({ initialData }: OSTBoardProps) {
     setApplyStatus(null);
   };
 
-  const handleGenerateSuggestions = () => {
+  const handleGenerateSuggestions = (sourceText?: string) => {
     if (!importedNote) {
       return;
     }
-    setSuggestions(generateOSTSuggestionsFromImportedNote(importedNote));
+    const inputText = sourceText?.trim() || importedNote.content;
+    setSuggestions(generateOSTSuggestionsFromText(inputText, importedNote.id));
     setApplyStatus(null);
   };
 

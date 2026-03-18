@@ -1,13 +1,16 @@
 import { useMemo, useState } from 'react';
 import type { ImportedNote } from '../types/noteImport';
 import { importNoteFromFile, importNoteFromPastedText } from '../utils/noteImport';
-import { generateOSTSuggestionsFromImportedNote } from '../utils/ostSuggestion';
+import {
+  buildDraftOstPreviewFromRawNote,
+  refineDraftOstPreview,
+} from '../utils/draftPreview';
 
 type NotesImportPanelProps = {
   importedNote: ImportedNote | null;
   onImported: (note: ImportedNote) => void;
   onClearImportedNote: () => void;
-  onGenerateSuggestions: () => void;
+  onGenerateSuggestions: (sourceText?: string) => void;
 };
 
 type Status = {
@@ -20,93 +23,6 @@ const statusStyles: Record<Status['type'], string> = {
   error: 'border-rose-200 bg-rose-50 text-rose-700',
 };
 
-const cleanLine = (text: string): string =>
-  text
-    .replace(/^draft:\s*/i, '')
-    .replace(/^we assume\s*/i, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-const firstSentence = (content: string): string => {
-  const sentence =
-    content
-      .replace(/\r/g, ' ')
-      .split(/[.!?]\s+/)
-      .map((part) => part.trim())
-      .find((part) => part.length > 24) ?? 'Improve business outcomes from the imported notes';
-  return sentence.length > 120 ? `${sentence.slice(0, 117)}...` : sentence;
-};
-
-const nextValue = (items: string[], cursor: { value: number }, fallback: string): string => {
-  const value = items[cursor.value];
-  cursor.value += 1;
-  return value ? cleanLine(value) : fallback;
-};
-
-const buildStructuredPreview = (note: ImportedNote): string => {
-  const suggestions = generateOSTSuggestionsFromImportedNote(note);
-  const opportunityTitles = suggestions.opportunities.map((item) => item.title);
-  const solutionTitles = suggestions.solutions.map((item) => item.title);
-  const assumptionTitles = suggestions.assumptions.map((item) => item.title);
-
-  const oppCursor = { value: 0 };
-  const solCursor = { value: 0 };
-  const assCursor = { value: 0 };
-
-  const outcome = `Outcome: ${firstSentence(note.content)}`;
-  const lines: string[] = [outcome];
-
-  const oppSpaceNames = [
-    'Opps space 1: Customer journey and experience',
-    'Opps space 2: Business enablement and execution',
-  ];
-
-  for (let spaceIndex = 0; spaceIndex < 2; spaceIndex += 1) {
-    lines.push(`- ${oppSpaceNames[spaceIndex]}`);
-
-    for (let bigIndex = 0; bigIndex < 3; bigIndex += 1) {
-      const bigFallback =
-        spaceIndex === 0
-          ? `Improve journey stage ${bigIndex + 1}`
-          : `Enable operating capability ${bigIndex + 1}`;
-      const bigTitle = nextValue(opportunityTitles, oppCursor, bigFallback);
-      lines.push(`    - Big opp ${bigIndex + 1}: ${bigTitle}`);
-
-      const smallOppCount = bigIndex === 0 ? 2 : 1;
-      for (let smallIndex = 0; smallIndex < smallOppCount; smallIndex += 1) {
-        const smallTitle = nextValue(
-          opportunityTitles,
-          oppCursor,
-          `Specific customer/business problem ${smallIndex + 1}`,
-        );
-        lines.push(`        - Small opp ${smallIndex + 1}: ${smallTitle}`);
-
-        const solutionCount = smallIndex === 0 ? 2 : 1;
-        for (let solutionIndex = 0; solutionIndex < solutionCount; solutionIndex += 1) {
-          const solutionTitle = nextValue(
-            solutionTitles,
-            solCursor,
-            `Solution direction ${solutionIndex + 1}`,
-          );
-          lines.push(`            - Solution ${solutionIndex + 1}: ${solutionTitle}`);
-
-          const assumptionCount = solutionIndex === 0 ? 2 : 1;
-          for (let assumptionIndex = 0; assumptionIndex < assumptionCount; assumptionIndex += 1) {
-            const assumptionTitle = nextValue(
-              assumptionTitles,
-              assCursor,
-              `Assumption to validate ${assumptionIndex + 1}`,
-            );
-            lines.push(`                - Assumption ${assumptionIndex + 1}: ${assumptionTitle}`);
-          }
-        }
-      }
-    }
-  }
-
-  return lines.join('\n');
-};
-
 export function NotesImportPanel({
   importedNote,
   onImported,
@@ -117,6 +33,8 @@ export function NotesImportPanel({
   const [pastedText, setPastedText] = useState('');
   const [status, setStatus] = useState<Status | null>(null);
   const [isImportingFile, setIsImportingFile] = useState(false);
+  const [draftPreview, setDraftPreview] = useState('');
+  const [isRefiningPreview, setIsRefiningPreview] = useState(false);
 
   const importedAtText = useMemo(() => {
     if (!importedNote) {
@@ -125,12 +43,15 @@ export function NotesImportPanel({
     return new Date(importedNote.importedAt).toLocaleString();
   }, [importedNote]);
 
-  const structuredPreview = useMemo(() => {
+  const previewText = useMemo(() => {
     if (!importedNote) {
       return '';
     }
-    return buildStructuredPreview(importedNote);
-  }, [importedNote]);
+    if (draftPreview.trim()) {
+      return draftPreview;
+    }
+    return buildDraftOstPreviewFromRawNote(importedNote.content, { fillMissing: false });
+  }, [draftPreview, importedNote]);
 
   const handleImportFile = async () => {
     if (!selectedFile) {
@@ -152,6 +73,7 @@ export function NotesImportPanel({
     }
 
     onImported(result.note);
+    setDraftPreview(buildDraftOstPreviewFromRawNote(result.note.content, { fillMissing: false }));
     setStatus({ type: 'success', message: result.message });
   };
 
@@ -165,7 +87,13 @@ export function NotesImportPanel({
     }
 
     onImported(result.note);
+    setDraftPreview(buildDraftOstPreviewFromRawNote(result.note.content, { fillMissing: false }));
     setStatus({ type: 'success', message: result.message });
+  };
+
+  const handleClearImportedNote = () => {
+    setDraftPreview('');
+    onClearImportedNote();
   };
 
   const handleGenerateSuggestionsClick = () => {
@@ -177,11 +105,30 @@ export function NotesImportPanel({
       return;
     }
 
-    onGenerateSuggestions();
+    onGenerateSuggestions(previewText || importedNote.content);
     setStatus({
       type: 'success',
       message:
         'Generated OST suggestions successfully. Review improved lines and recommendations below.',
+    });
+  };
+
+  const handleRefinePreview = async () => {
+    if (!importedNote) {
+      setStatus({
+        type: 'error',
+        message: 'Import notes first, then run AI review for preview refinement.',
+      });
+      return;
+    }
+
+    setIsRefiningPreview(true);
+    const refined = await refineDraftOstPreview(importedNote.content, previewText);
+    setIsRefiningPreview(false);
+    setDraftPreview(refined.preview);
+    setStatus({
+      type: 'success',
+      message: 'AI-assisted preview refinement completed. Review the updated draft before generating OST.',
     });
   };
 
@@ -233,12 +180,20 @@ export function NotesImportPanel({
             {importedNote ? (
               <button
                 type="button"
-                onClick={onClearImportedNote}
+                onClick={handleClearImportedNote}
                 className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
               >
                 Clear imported note
               </button>
             ) : null}
+            <button
+              type="button"
+              onClick={handleRefinePreview}
+              disabled={!importedNote || isRefiningPreview}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isRefiningPreview ? 'Refining preview...' : 'AI review & refine preview'}
+            </button>
           </div>
         </div>
 
@@ -296,7 +251,7 @@ export function NotesImportPanel({
           ) : null}
           <p className="mt-3 text-sm font-medium text-slate-800">Imported note preview</p>
           <pre className="mt-1 max-h-72 overflow-auto whitespace-pre rounded-lg border border-slate-200 bg-white p-3 text-xs leading-relaxed text-slate-700">
-            {structuredPreview || 'No preview content available.'}
+            {previewText || 'No preview content available.'}
           </pre>
         </div>
       ) : null}
